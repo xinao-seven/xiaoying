@@ -254,6 +254,7 @@
 | 15 | 选中 `text/plain` 与 6 MB PNG | 槽位分别提示“仅支持 JPEG、PNG 格式，当前为 text/plain”“图片不能超过 5 MB，当前 6 MB”，未发起上传（TC-MAN-14） |
 | 16 | 交付镜像运行用户 | 后端/前端 Dockerfile 均为非 root（`app` / `node`），健康检查分别使用 `curl` 与 `wget` |
 | 17 | compose 默认端口与配置 | `docker compose config --services` 为 mysql/backend/frontend；dev 组合仅 mysql/backend，`--profile full` 才含前端 |
+| 18 | `git archive ... v1.0-submission` 生成交付压缩包 | 239 个条目、538 KB；不含 `node_modules/target/.next/data`；只含 `.env.example`，无真实 `.env` |
 
 备注：
 - IAB 不提供文件选择器，第 3、15 项通过页面内构造 `File` + `DataTransfer` 赋给 `input[type=file]` 并触发 `change`；组件状态机、XHR、代理与后端均为真实执行。
