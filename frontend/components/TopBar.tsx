@@ -75,6 +75,9 @@ export function TopBar() {
           <Link href="/" aria-current={pathname === "/" ? "page" : undefined}>
             模板
           </Link>
+          <Link href="/history" aria-current={pathname === "/history" ? "page" : undefined}>
+            历史
+          </Link>
         </nav>
       )}
 
