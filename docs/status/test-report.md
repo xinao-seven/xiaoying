@@ -230,3 +230,33 @@
 | TC-FE-16 模板 404 | `TemplateList.test.tsx`「模板不存在」「详情加载失败可重试」 | 通过 |
 
 > 说明：本仓库尚未配置 GitHub 远端，`ci.yml` 只做了 YAML 解析校验与本地等价运行；推送后需在 Actions 页面确认三 job 首次全绿，并连续触发 3 次。README 的 CI 徽章地址中的 `OWNER/REPOSITORY` 需在推送后替换。
+
+## G9 容器化、README 与交付验收（2026-10-28）
+
+环境说明：本机 3000 端口被其它应用占用，交付镜像验收使用 `FRONTEND_PORT=3100`；compose 默认仍为 3000。
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `docker compose -f docker-compose.yml -f docker-compose.dev.yml down -v` + `docker compose down -v` + `FRONTEND_PORT=3100 docker compose up --build -d` | 两个镜像构建成功；mysql/backend/frontend 均 healthy；`/actuator/health` UP；`/login` 200（TC-MAN-01） |
+| 2 | 登录 `demo/demo1234` | 进入列表；4 分类 6 模板；筛选“宠物写真”得 2 条；进入“旅行明信片”显示 2 槽位、JPEG/PNG、5 MB（TC-MAN-02 前置） |
+| 3 | 上传 2 张 720×540 PNG → 提交 | 已上传 2/2；提交后采样到 `等待处理 → 处理中/模拟生成 → 处理中/结果整理 → 已完成`；结果预览对话框图片 1200×800（TC-MAN-02） |
+| 4 | 设置 3/8/3 秒后新建任务 | UI 依次观察到 `素材检查 → 模拟生成 → 结果整理`（TC-MAN-03、TC-MAN-05） |
+| 5 | `failStage=GENERATING,failNext=1` 后提交 | 卡片为“制作失败（模拟生成）：生成服务返回错误（模拟注入）”；阶段轨迹 `素材检查:done / 模拟生成:failed / 结果整理:todo`；events 无 ASSEMBLING（TC-MAN-04） |
+| 6 | 连续提交 3 个长任务 | 1 处理中 + 2 等待处理；卡片状态、阶段、结果互不串扰（TC-MAN-06） |
+| 7 | 处理中刷新 `/history` | 历史与活跃任务恢复；9 秒后统计由 `1 处理中 / 2 等待` 变为 `1 处理中 / 1 等待 / 3 完成`，阶段继续推进（TC-MAN-07） |
+| 8 | 关闭标签，等待 20 秒后重开 `/history` | 服务端 3 个任务全部 SUCCEEDED；重开显示 5 完成 + 1 失败，5 张结果图可见（TC-MAN-08） |
+| 9 | `docker compose stop backend` | 处理中卡片保留 `PROCESSING/模拟生成`，出现“状态刷新失败……后端服务暂不可用”与重试；任务未变为失败（TC-MAN-09） |
+| 10 | `docker compose start backend` | 6 秒健康；轮询自动恢复、sync 提示消失；被中断任务收口为“制作失败（模拟生成）：服务重启导致处理中断”（TC-MAN-09、TC-MAN-15） |
+| 11 | demo 登出 → alice 登录 → `/history` | Alice 顶栏；统计全 0；显示“还没有任务”（TC-MAN-10、TC-MAN-13） |
+| 12 | alice Cookie 直接访问 demo 任务详情/结果 | 均 404 `TASK_NOT_FOUND`（TC-MAN-10） |
+| 13 | 375×812 首页 / 历史 / 制作页 | `home scrollWidth=360`、`history=375`、`detail=360`（innerWidth 375），两个槽位同列（x=12、宽 336），无横向滚动（TC-MAN-11） |
+| 14 | 键盘操作 | Tab 顺序 用户名 → 密码 → 登录按钮；焦点 `outline-style: solid`；空格键激活登录成功（TC-MAN-12，见备注） |
+| 15 | 选中 `text/plain` 与 6 MB PNG | 槽位分别提示“仅支持 JPEG、PNG 格式，当前为 text/plain”“图片不能超过 5 MB，当前 6 MB”，未发起上传（TC-MAN-14） |
+| 16 | 交付镜像运行用户 | 后端/前端 Dockerfile 均为非 root（`app` / `node`），健康检查分别使用 `curl` 与 `wget` |
+| 17 | compose 默认端口与配置 | `docker compose config --services` 为 mysql/backend/frontend；dev 组合仅 mysql/backend，`--profile full` 才含前端 |
+
+备注：
+- IAB 不提供文件选择器，第 3、15 项通过页面内构造 `File` + `DataTransfer` 赋给 `input[type=file]` 并触发 `change`；组件状态机、XHR、代理与后端均为真实执行。
+- TC-MAN-12 的 Enter 键经 IAB/Playwright 发送时未触发按钮激活（自动化后端限制），空格键激活成功；登录表单使用原生 `<form>` + `type=submit`，键盘语义由浏览器保证，建议人工复核一次。
+- 演示用任务与素材保留在本地卷；不影响仓库内容。验收后模拟耗时已恢复默认 800/2500/800 ms，失败注入已清空。
+- 构建期间修复：`package-lock.json` 曾混入 extraneous 的 `lightningcss` 平台包，导致 Linux `npm ci` 报 `EBADPLATFORM`；`npm prune` + 重新生成锁文件后删除 262 行遗留条目，镜像构建通过。

@@ -16,8 +16,8 @@
 | R-10 身份与个人记录 | 完成 | `/api/auth/*`；`LoginForm` 成功登录与 `TopBar` 登出均 `resetAll()`；素材、任务、结果均按 `user_id` 过滤，越权统一 404；轮询 cleanup abort 在途请求 | `SessionServiceTest`、`AuthControllerTest`、`TaskQueryServiceTest`、TC-FE-07、G7 alice 隔离检查 | 切换用户不残留上一账号任务 |
 | R-11 视觉与可用性 | 完成 | 深色主题；列表/详情双栏/历史页；语义化按钮与 label、`aria-pressed`、`aria-current=step`、`role=alert/status`；结果对话框 Esc/焦点返回；375 px 无横向滚动 | 浏览器 G5/G6/G7 检查、TC-FE-03、TC-MAN-11/12（M9 复核） | `/history` 375 px 实测 `scrollWidth=375` |
 | R-12 CI 与测试 | 完成（远端待触发） | `.github/workflows/ci.yml` 三 job；`scripts/ci/migration-smoke.sh`；`test-report.md` 全量 TC-BE-01～22、TC-FE-01～16 矩阵；本地等价三遍全绿 | 前端 46、后端 103、迁移冒烟 3×OK | 仓库无远端，GitHub Actions 未实际触发；推送后需确认三 job 首次全绿 |
-| R-13 提交材料与说明 | 进行中 | `README.md`（版本表、结构、命令、接口、账号、素材来源） | — | 骨架已建；M9 补齐 16 项 |
-| R-14 容器交付 | 未开始 | `docker-compose.yml`（当前仅 MySQL） | — | M9 |
+| R-13 提交材料与说明 | 完成（发送动作待交付人） | `README.md` 覆盖 10.2 十六项（§1～§20 对照表）、实际投入、取舍、AI 使用、第三方来源、压缩包排除项；tag `v1.0-submission` | 文档走查、G9 | “通过原渠道发送仓库/压缩包并确认日期”需交付人执行 |
+| R-14 容器交付 | 完成 | `backend/Dockerfile`（多阶段、非 root）、`frontend/Dockerfile`（standalone、非 root）、`docker-compose.yml` 三服务/健康检查/双卷；空卷 `up --build` 三服务 healthy | G9 第 1、16、17 项 | 本机 3000 被占用，验收用 3100；默认仍 3000 |
 
 ## 阶段门
 
@@ -33,5 +33,6 @@
 | G6 | 通过 | 10 个上传/提交测试；浏览器 2 槽位、类型/大小拦截、真实 XHR 上传 2/2、替换/移除、停后端单槽失败后重试、提交后服务端总数 +1 且任务卡片立即出现；证据见 `test-report.md` G6 |
 | G7 | 通过 | 46 个前端测试；浏览器 3 任务状态隔离、终态 6 秒无新轮询、处理中刷新后阶段继续、停后端保留状态+重试提示、重启自动恢复、alice 历史为空且 demo 任务 404、预览对话框焦点返回、375 px 无溢出；证据见 `test-report.md` G7 |
 | G8 | 通过（本地等价，远端待触发） | 三 job 工作流与迁移冒烟脚本已提交；前端 46 tests、后端 103 tests、迁移 migrate/validate/种子/认领 SQL 连续 3 次全绿；仓库无 GitHub 远端，Actions 尚未实际运行；证据见 `test-report.md` G8 |
+| G9 | 通过 | 空卷 `docker compose up --build -d` 三服务 healthy；TC-MAN-01～15 全部执行（成功闭环、三阶段可观察、失败中断、耗时调整、多任务、刷新、关闭页面、查询异常、用户隔离、375 px、键盘、空历史、上传校验、重启对账）；README 16 项齐全；证据见 `test-report.md` G9 |
 
 > 注：G0～G2 的「通过」行在首个提交 `ab1e371` 即已写入（G1/G2 早于对应代码提交），commit 证据到 `d3ca83b` 才补齐，晚于 `gate-m1`/`gate-m2` 标签。历史不改写；后续门按计划 14.3/15.4 执行「文档提交 → 打标签」。

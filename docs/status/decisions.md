@@ -98,3 +98,24 @@
 - 备选：原生 `<dialog>` + `showModal()`；自绘遮罩 + `role=dialog`。
 - 结论：使用受控的自绘对话框；打开时记录 `document.activeElement` 并聚焦关闭按钮，监听 document 的 Esc，关闭时恢复焦点与 `body.overflow`。
 - 影响：jsdom 不实现 `showModal`，自绘实现可在 Vitest 中直接断言焦点与关闭行为；代价是需要自行维护焦点返回，未实现完整的焦点陷阱（Tab 仍可离开对话框）。
+
+## D15 交付镜像：多阶段构建 + standalone + 非 root（2026-10-28）
+
+- 背景：需要在 `docker compose up --build` 下一条命令启动三服务，镜像不携带构建工具，前端不能依赖宿主机环境。
+- 备选：单阶段运行 Maven/Node；本地打 jar 再 COPY；多阶段构建。
+- 结论：后端用 `maven:3.9-eclipse-temurin-21` 构建、`eclipse-temurin:21-jre-jammy` 运行；前端用 `node:22-alpine` 三阶段构建，复制 `output: "standalone"` 产物；两者均非 root，健康检查分别用 curl 与 wget。
+- 影响：镜像不含源码与构建缓存；首次构建需下载依赖（约 3～8 分钟），后续利用层缓存；运行时镜像额外安装 curl 以支持 healthcheck。
+
+## D16 开发编排与交付编排共存：`!reset` / `!override` + profile（2026-10-28）
+
+- 背景：交付编排把 backend 定义为 build 服务；开发编排需要同一个服务改成 Maven 镜像 + 源码挂载，同时保留“宿主机前端”的开发方式。
+- 备选：维护两份互不引用的 compose；用 `docker compose -f a -f b` 合并并覆盖差异。
+- 结论：开发编排用 `build: !reset null` 去掉构建、`ports/volumes: !override` 避免重复映射与卷合并，并给 frontend 加 `profiles: ["full"]`，默认只启动 mysql + backend；需要前端镜像时加 `--profile full`。
+- 影响：开发命令与交付命令都保持一条；需要 Compose v2.24+，README 已注明；旧版 Compose 可只用交付编排。
+
+## D17 锁文件卫生：删除 extraneous 平台包（2026-10-28）
+
+- 背景：`npm ci` 在 Linux 镜像中安装 `lightningcss-android-arm64` 等 extraneous 包并报 `EBADPLATFORM`，而本机 Windows 安装不受影响。
+- 备选：在 Dockerfile 中 `npm ci --omit=optional`；`--force` 忽略平台；清理锁文件后重新生成。
+- 结论：`npm prune` 删除本地遗留包，`npm install --package-lock-only` 重写锁文件，移除 262 行 extraneous 条目；保留所有真实依赖与平台可选包解析。
+- 影响：Linux/Windows 安装行为一致；锁文件更小；后续不应把本地实验性安装写入交付锁文件。

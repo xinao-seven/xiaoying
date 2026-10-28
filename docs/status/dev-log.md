@@ -294,3 +294,35 @@
 遗留 / 风险：
 - CI 徽章中的 `OWNER/REPOSITORY` 是占位符，推送后必须替换。
 - GitHub Actions 首次运行需要下载 npm/Maven 依赖，耗时会明显高于本地缓存运行。
+
+## 2026-10-28 · M9 容器化、README 与交付（1.5 人日）
+
+目标：把“能跑”变成“别人能干净跑起来”，并留下可复制的验收路径。
+
+完成：
+- `backend/Dockerfile`：`maven:3.9-eclipse-temurin-21` 构建 → `eclipse-temurin:21-jre-jammy` 运行；安装 curl 供健康检查；`app` 非 root；`/data` 归属应用用户；`HEALTHCHECK` 调 `/actuator/health`。
+- `frontend/Dockerfile`：deps/build/runner 三阶段；`node:22-alpine`；复制 `output: "standalone"` 产物、`public` 与 `.next/static`；`node` 非 root；`PORT=3000`、`HOSTNAME=0.0.0.0`。
+- `docker-compose.yml`：mysql（healthcheck）→ backend（`depends_on: service_healthy`，`app-data:/data`）→ frontend（`BACKEND_URL=http://backend:8080`，healthcheck `/login`）；端口均可通过 env 覆盖。
+- `docker-compose.dev.yml`：用 `build: !reset null`、`ports/volumes: !override` 覆盖交付服务，保持 Maven 镜像热挂载开发；前端加 `profiles: ["full"]`，默认只起 MySQL + 后端。
+- `.dockerignore`：排除 `node_modules/.next/target/data` 等；`.gitattributes` 已保证脚本/SQL/YAML 为 LF。
+- README 按需求 10.2 重写为 20 节，含 16 项对照、配置表、接口与示例、演示步骤、身份设计、重启边界、部署回滚、投入与取舍、AI 使用、第三方来源、交付与压缩包排除。
+- 更新 requirements-status（R-13/R-14 完成、G9 通过）、test-report G9 17 项验收证据、decisions D15/D16。
+
+验证：
+- `docker compose down -v` 后 `FRONTEND_PORT=3100 docker compose up --build -d`：mysql/backend/frontend 全部 healthy；`/actuator/health` UP；`/login` 200。
+- 浏览器完整演示：登录、分类、上传 2 图、提交、三阶段、结果预览（1200×800）、3/8/3 秒耗时、失败注入、3 任务串行、刷新恢复、关闭标签、停/启后端、alice 隔离、375 px、键盘登录。
+- 交付镜像与空卷重启均验证；验收后恢复默认耗时并清空失败注入。
+
+偏离与决策：
+- 前端 runner 直接使用 `node:22-alpine` 的 `node` 用户，不额外创建用户，减少镜像层；后端 JRE 镜像创建独立 `app` 用户。
+- 开发编排使用 Compose 的 `!reset/!override`（需要 Compose v2.24+）。README 已注明前置条件；旧版 Compose 用户可只用交付编排。
+- 本机 3000 被其它应用占用，验收通过 `FRONTEND_PORT=3100` 完成；默认配置不改，保证交付环境仍是 3000。
+
+问题与修复：
+- 首次前端镜像构建失败：`package-lock.json` 含 12 个 extraneous 的 `lightningcss` 平台包，Linux `npm ci` 报 `EBADPLATFORM (android-arm64)`。`npm prune` + `npm install --package-lock-only` 删除 262 行遗留条目后构建通过；本地单测与构建复跑仍 46/46。
+- 首次启动时 3100 仍被上一轮 Next dev 子进程占用；终止残留 node 进程后启动成功。
+
+遗留 / 风险：
+- GitHub Actions 尚未实际触发（无远端），首次推送后需确认三 job 全绿。
+- 交付镜像未做漏洞扫描与镜像大小优化；后端运行时安装 curl 增加了少量体积。
+- 结果对话框未实现完整焦点陷阱；Esc 与焦点返回已覆盖。
