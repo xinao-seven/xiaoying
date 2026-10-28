@@ -1,0 +1,7 @@
+# 统一换行：脚本、SQL、YAML 在 Linux CI 中必须为 LF
+* text=auto
+*.sh text eol=lf
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+backend/mvnw text eol=lf
