@@ -1,0 +1,9 @@
+target
+.git
+.gitignore
+data
+uploads
+results
+*.log
+.idea
+.vscode
