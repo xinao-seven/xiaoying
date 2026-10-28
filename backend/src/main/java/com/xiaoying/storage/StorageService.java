@@ -63,6 +63,23 @@ public class StorageService {
         return dir;
     }
 
+    /** 结果文件固定为 {@code results/{taskId}.png}，数据库只保存相对 key。 */
+    public String storeResult(String taskId, byte[] data) {
+        String key = "results/" + sanitize(taskId) + ".png";
+        Path target = resolve(key);
+        try {
+            Files.createDirectories(target.getParent());
+            Files.write(target, data, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        } catch (IOException ex) {
+            throw new UncheckedIOException("写入结果文件失败", ex);
+        }
+        return key;
+    }
+
+    public Path resultPath(String taskId) {
+        return resolve("results/" + sanitize(taskId) + ".png");
+    }
+
     public Path resolve(String key) {
         Path path = root.resolve(key).normalize();
         if (!path.startsWith(root)) {

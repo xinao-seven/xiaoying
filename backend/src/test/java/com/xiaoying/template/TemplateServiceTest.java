@@ -93,6 +93,11 @@ class TemplateServiceTest {
         }
 
         @Override
+        public TemplateRow findById(String id) {
+            return findEnabledById(id);
+        }
+
+        @Override
         public List<CategoryCountRow> countByCategory() {
             return counts;
         }

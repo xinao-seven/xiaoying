@@ -23,6 +23,10 @@ public interface TemplateMapper {
     @Select("SELECT " + COLUMNS + " FROM templates WHERE enabled = 1 AND id = #{id}")
     TemplateRow findEnabledById(@Param("id") String id);
 
+    /** 流水线读取模板要求，不要求模板仍处于启用状态（任务创建后模板下架不影响已受理任务）。 */
+    @Select("SELECT " + COLUMNS + " FROM templates WHERE id = #{id}")
+    TemplateRow findById(@Param("id") String id);
+
     @Select("""
             SELECT category, COUNT(*) AS cnt
             FROM templates

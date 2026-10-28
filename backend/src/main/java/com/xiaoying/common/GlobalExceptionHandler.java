@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.multipart.MultipartException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
@@ -68,6 +69,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class})
     public ResponseEntity<ApiError> handleMissingPart(Exception ex, HttpServletRequest request) {
         return build(ErrorCode.VALIDATION_ERROR, "缺少必要的请求参数", null, request);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<ApiError> handleTypeMismatch(MethodArgumentTypeMismatchException ex,
+                                                       HttpServletRequest request) {
+        Map<String, String> fieldErrors = new LinkedHashMap<>();
+        fieldErrors.put(ex.getName(), "参数类型不正确");
+        return build(ErrorCode.VALIDATION_ERROR, "请求参数类型不正确", fieldErrors, request);
     }
 
     @ExceptionHandler(MultipartException.class)
