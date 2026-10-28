@@ -23,7 +23,7 @@
 
 | 门 | 状态 | 证据 |
 |---|---|---|
-| G0 | 通过 | `npm run build` 成功；Maven 容器 `mvn -B -DskipTests package` 成功；`flyway:info` 连上 MySQL 8.4 并列出 7 个待执行迁移 |
-| G1 | 通过 | `mvn -B test` 33 个测试全绿；curl 登录/登出/me 与 Cookie 属性符合；清空卷后重启应用自动完成 V1～V7 |
-| G2 | 通过 | `GET /api/templates` 返回 6 条；分类筛选 2 条；上传 PNG 201 且落盘；用户 B 取 A 素材 404；伪造 PNG 415；11 MB 上传 413 JSON |
+| G0 | 通过 | commit `ab1e371`；`npm ci && npm run build` 成功；`mvn -B -DskipTests package` 成功；`flyway:info` 连上 MySQL 8.4 并列出 7 个待执行迁移 |
+| G1 | 通过 | commit `9f9a6b9`；`./mvnw -B verify` 33 个测试全绿；curl 登录/登出/me 与 Cookie 属性符合；清空卷后重启应用自动完成 V1～V7 |
+| G2 | 通过 | commit `2a289cc`；`GET /api/templates` 返回 6 条；分类筛选 2 条；上传 PNG 201 且落盘；用户 B 取 A 素材 404；伪造 PNG 415；11 MB 上传 413 JSON |
 | G3 | 未开始 | — |

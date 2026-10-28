@@ -145,3 +145,14 @@ docker compose down -v && docker compose up -d mysql
 - 实际投入、取舍、已知限制、AI 使用说明、第三方来源（M9）
 
 需求追踪与过程证据见 `docs/status/`。
+
+## 门标签
+
+| 标签 | 里程碑 | commit |
+|---|---|---|
+| `gate-m0` | 立项与版本验证 | `ab1e371` |
+| `gate-m1` | 迁移、认证、错误模型 | `9f9a6b9` |
+| `gate-m2` | 模板与素材 | `2a289cc` |
+
+后端构建、测试与迁移验证使用 `maven:3.9-eclipse-temurin-21` 容器（本机无 JDK），
+前端在 Node 24.18 下验证，CI 与容器镜像将固定 Node 22。

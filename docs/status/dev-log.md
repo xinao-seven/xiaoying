@@ -45,6 +45,9 @@
 - curl 错误密码 401 JSON；登录 Set-Cookie 含 `HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`；登出 204 并清 Cookie；登出后 me 401。
 - `docker compose down -v` 清空后重启应用：Flyway 从空库应用 V1～V7 成功，种子可用。
 
+偏离与决策：
+- `SimulationProperties`（初始耗时）推迟到 M4 与 `SimulationService` 一起落地；M1 只保留 `application.yml` 中的 `app.simulation.delays.*`，运行期不读取，避免出现两处配置同时生效。见 D4。
+
 ## 2026-10-28 · M2 模板浏览与素材上传（1.0 人日）
 
 目标：模板数据从 MySQL 经 Java 输出；素材可上传、可落盘、可按归属取回。

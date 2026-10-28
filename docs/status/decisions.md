@@ -21,3 +21,10 @@
 - 背景：`Content-Type` 可伪造。
 - 结论：只认 JPEG `FF D8 FF` 与 PNG `89 50 4E 47 0D 0A 1A 0A`，再用 `ImageIO` 解码取尺寸；解码失败返回 400 `MATERIAL_UNREADABLE`。
 - 影响：上传阶段即拒绝伪造文件；完整业务校验仍留在 M3 的 `MATERIAL_CHECK`。
+
+## D4 模拟配置单一来源：`simulation_config` 表（2026-10-28）
+
+- 背景：需求 FR-SIM-10 要求运行期只有一个权威来源，避免配置文件与数据库同时生效。
+- 备选：只读 `app.simulation.delays.*`；只读数据库；两者合并。
+- 结论：运行期只读 `simulation_config` 单例表；`app.simulation.delays.*` 只在 M4 首次初始化该表时使用。`SimulationProperties` 因此推迟到 M4 与初始化逻辑一起实现，M1 不引入未使用的配置类。
+- 影响：开发接口改耗时立即对新任务生效；已创建任务的失败计划仍由 `tasks.planned_fail_stage` 快照决定。

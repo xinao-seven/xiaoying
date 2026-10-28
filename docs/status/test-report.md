@@ -8,6 +8,7 @@
 | # | 命令 | 结果 |
 |---|---|---|
 | 1 | `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` | 通过：lint 0 问题；tsc 0 错误；Vitest 4 passed；Next build 生成 4 个静态页 |
+| 1b | `cd frontend && npm ci && npm run build` | 干净安装成功（458 packages，21 s），构建通过 |
 | 2 | `docker run --rm -v "$PWD/backend:/ws" -w /ws -v xiaoying-m2:/root/.m2 maven:3.9-eclipse-temurin-21 mvn -B -DskipTests package` | BUILD SUCCESS，产物 `target/xiaoying-backend-0.1.0.jar` |
 | 3 | `docker compose up -d mysql` + `mvn -B flyway:info '-Ddb.url=jdbc:mysql://mysql:3306/xiaoying?...'` | 连接 MySQL 8.4，显示 V1～V7 均为 Pending（空库） |
 
@@ -16,6 +17,7 @@
 | # | 命令/检查 | 结果 |
 |---|---|---|
 | 1 | `mvn -B test` | Tests run: 33, Failures: 0, Errors: 0；AuthControllerTest 7、SessionServiceTest 4、MaterialControllerTest 5、MaterialUploadServiceTest 8、TemplateControllerTest 5、TemplateServiceTest 4 |
+| 1b | `./mvnw -B verify`（Maven 容器内） | 33 tests green，BUILD SUCCESS；证明 Wrapper 3.3.4 可用 |
 | 2 | `curl -X POST /api/auth/login -d '{"username":"demo","password":"wrong"}'` | 401 `{"code":"INVALID_CREDENTIALS","message":"用户名或密码错误","traceId":"req_..."}` |
 | 3 | 登录 demo | 200；`Set-Cookie: XIAOYING_SESSION=...; Path=/; Max-Age=604800; HttpOnly; SameSite=Lax` |
 | 4 | 登出后带旧 Cookie 访问 `/api/auth/me` | 401 `UNAUTHORIZED`；登出响应 204 且 `Max-Age=0` |
