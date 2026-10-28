@@ -1,0 +1,36 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# builds
+.next/
+out/
+dist/
+build/
+target/
+
+# runtime data
+data/
+uploads/
+results/
+*.log
+.tmp/
+
+# env
+.env
+.env.local
+.env.*.local
+
+# tooling
+.DS_Store
+Thumbs.db
+*.iml
+.idea/
+.vscode/
+coverage/
+*.tsbuildinfo
+.mvn/wrapper/maven-wrapper.jar.tmp
+
+# docker
+docker-compose.override.yml
