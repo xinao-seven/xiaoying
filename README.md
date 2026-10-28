@@ -2,11 +2,11 @@
 
 浏览模板、上传素材、提交制作任务。任务由 Java 后台按「素材检查 → 模拟生成 → 结果整理」三阶段异步执行，前端可以继续浏览，并跟踪任务状态、阶段与结果图。
 
-[![CI](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml)
+[![CI](https://github.com/xinao-seven/xiaoying/actions/workflows/ci.yml/badge.svg)](https://github.com/xinao-seven/xiaoying/actions/workflows/ci.yml)
 
-> 仓库尚未配置 GitHub 远端；推送后请把徽章与链接中的 `OWNER/REPOSITORY` 替换为实际地址。
+> 仓库地址：<https://github.com/xinao-seven/xiaoying>。CI 在 push / pull request 时自动运行。
 
-- 当前进度：M0～M9 全部完成，交付快照 tag `v1.0-submission`。
+- 当前进度：M0～M9 全部完成；代码基线 tag `v1.0-submission`（`5162819`），文档与 CI 状态以 `master` 最新提交为准。
 - 本文档按题目「10.2 README 必须包含」的 16 项组织；对应关系见文末「README 16 项对照」。
 
 ## 1. 项目简介
@@ -287,7 +287,7 @@ curl -s -X POST http://127.0.0.1:8080/api/dev/simulation \
 | 7 | 连续提交 3 个长任务 | 串行时 1 处理中 + 2 等待；状态、阶段、结果互不串扰 |
 | 8 | 处理中刷新页面 | 历史恢复；阶段继续更新，无需重新提交 |
 | 9 | 提交后关闭标签，稍后重开 | 任务已完成或仍在处理；结果可见 |
-| 10 | `docker compose stop backend` | 卡片保留最后状态，出现“状态刷新失败 / 重试”；任务不变为失败；`start` 后自动恢复 |
+| 10 | `docker compose stop backend` | 卡片保留最后状态，出现“状态刷新失败 / 重试”；停机期间不把任务标记为失败。`start` 后恢复轮询：PENDING 继续处理，停机时处于 PROCESSING 的任务按 §12 标记为 FAILED/SERVER_RESTART |
 | 11 | demo 建任务 → 登出 → 登录 alice | alice 历史为空；直接访问 demo 任务/结果/事件均 404 |
 | 12 | 375 px 宽 + 键盘操作 | 无横向滚动；Tab 焦点可见；按钮可用空格/回车激活 |
 
@@ -366,16 +366,15 @@ docker run --rm --network xiaoying_default \
 
 > Windows Git Bash 下如遇到路径被改写，给 `docker run` 前加 `MSYS_NO_PATHCONV=1`。
 
-> 本仓库未配置 GitHub 远端，Actions 尚未实际触发；G8 记录的是同一组命令在本地连续三次的结果。推送后需确认首次三 job 全绿并替换徽章地址。
+> GitHub Actions 已配置并在 push / pull request 时自动运行；仓库首次运行的三个 job（frontend、backend、migration-smoke）均已通过。以下为本地等价复跑方式。
 
 ## 15. 已完成、未完成与已知限制
 
-已完成：R-01～R-14 的功能、测试、CI 配置、容器交付与文档。题目要求的功能均已实现并通过演示。
+已完成：R-01～R-14 的功能、测试、CI 配置、容器交付与文档；仓库已推送，GitHub Actions 首次运行三个 job 全绿。题目要求的功能均已实现并通过演示。
 
 未完成 / 由交付人执行：
 
 - 通过原沟通渠道发送仓库链接或压缩包，并与对方确认提交日期（本 README 记录快照日期，实际发送动作由交付人完成）。
-- 向 GitHub 推送后触发 Actions 首次运行、替换 CI 徽章中的 `OWNER/REPOSITORY`。
 - 完整焦点陷阱（结果对话框内 Tab 可离开对话框）；当前已实现 Esc 关闭与焦点返回。
 
 已知限制：
@@ -443,13 +442,15 @@ docker run --rm --network xiaoying_default \
 
 ## 19. 交付与验收
 
-- 交付快照：tag `v1.0-submission`（`git describe --tags --always` 可查）。
+- 仓库：<https://github.com/xinao-seven/xiaoying>（分支 `master`）。
+- 验收 commit：`master` 最新提交；代码基线 tag `v1.0-submission` 指向 `5162819`。
 - 验收环境：`docker compose down -v && docker compose up --build -d`，三服务 healthy。
 - 提交方式：仓库链接或压缩包，经原沟通渠道发送；提交日期：2026-10-28（以双方最终确认为准）。
 - 压缩包排除：`node_modules/`、`.next/`、`target/`、`dist/`、`data/`、`uploads/`、`results/`、`.env`、日志与本地截图。可用：
 
 ```bash
-git archive --format=zip --prefix=xiaoying/ -o xiaoying.zip v1.0-submission
+# 使用 master 以包含最新 README；如需代码基线可改用 tag v1.0-submission
+git archive --format=zip --prefix=xiaoying/ -o xiaoying.zip master
 ```
 
 - 需求追踪：`docs/status/requirements-status.md`；过程记录：`docs/status/dev-log.md`；测试证据：`docs/status/test-report.md`；决策：`docs/status/decisions.md`。
@@ -489,6 +490,6 @@ git archive --format=zip --prefix=xiaoying/ -o xiaoying.zip v1.0-submission
 | `gate-m6` | 制作页上传槽位与提交 | `05a7d71`、`b8dcfe8` |
 | `gate-m7` | 任务跟踪、历史与刷新恢复 | M7 提交 |
 | `gate-m8` | 测试补齐与 CI | M8 提交 |
-| `v1.0-submission` | 容器、README 与交付快照 | 本次 M9 提交 |
+| `v1.0-submission` | 容器与代码基线（M9） | `5162819` |
 
 需求追踪与过程证据见 `docs/status/`。后端构建/测试同时支持本机 JDK 21 与 Maven 容器；CI 与交付镜像固定 Node 22、Java 21。
