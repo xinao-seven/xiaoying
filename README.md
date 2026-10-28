@@ -44,7 +44,7 @@
 │   ├── public/demo/         # 自生成示例封面
 │   └── scripts/             # 封面生成脚本
 ├── docs/                    # 需求、执行计划、完成记录
-├── pic/                     # 前端参考 UI（仅参考布局）
+├── pic/                     # 本地参考 UI 截图（不参与构建，不纳入交付）
 ├── docker-compose.yml       # 基础编排（MySQL；M9 补齐三服务）
 ├── docker-compose.dev.yml   # 开发编排：后端跑在 Maven 镜像里，无需本机 JDK
 └── .env.example
@@ -94,7 +94,7 @@ cd backend
 ./mvnw flyway:info         # 默认连接 localhost:13306
 ```
 
-数据库连接默认值为 `jdbc:mysql://localhost:13306/xiaoying`（与 compose 的宿主机端口一致），需要时可覆盖：
+数据库连接默认值为 `jdbc:mysql://localhost:13306/xiaoying`（应用与 flyway 插件一致，与 compose 的宿主机端口对应）；dev compose 通过 `SPRING_DATASOURCE_URL` 覆盖为 `mysql:3306`。需要时可覆盖：
 
 ```bash
 ./mvnw flyway:info -Ddb.url='jdbc:mysql://localhost:3306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC' -Ddb.user=xiaoying -Ddb.password=xiaoying
@@ -155,6 +155,8 @@ docker compose down -v && docker compose up -d mysql
 
 错误体统一为 `{code, message, fieldErrors?, traceId}`。
 
+开发模拟接口（M4 起）`/api/dev/simulation` 受 `APP_SIMULATION_DEV_API_ENABLED` 控制；演示环境默认开启且不要求登录，仅限本地演示。
+
 ## 素材与示例资源
 
 - 素材落盘：`{APP_DATA_DIR}/uploads/{userId}/{uuid}.{ext}`，数据库只存相对 key。
@@ -179,6 +181,7 @@ docker compose down -v && docker compose up -d mysql
 | `gate-m0` | 立项与版本验证 | `ab1e371` |
 | `gate-m1` | 迁移、认证、错误模型 | `9f9a6b9` |
 | `gate-m2` | 模板与素材 | `2a289cc` |
+| `gate-m2.1` | 上传时间毫秒精度修复复跑 | `aa43e72` |
 
 后端构建、测试与迁移验证使用 `maven:3.9-eclipse-temurin-21` 容器（本机无 JDK），
 前端在 Node 24.18 下验证，CI 与容器镜像将固定 Node 22。

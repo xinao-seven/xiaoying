@@ -85,3 +85,22 @@
 
 偏离与决策：
 - 开发编排与 M9 交付镜像分离：开发用 Maven 镜像直接跑源码，M9 再提供多阶段 Dockerfile，避免提前维护两套构建。
+
+## 2026-10-28 · M2 后审查修正
+
+目标：消除审查发现的配置、错误映射与文档不一致，并补上计划要求的配置类与测试。
+
+完成：
+- `application.yml`：数据源默认端口改为 13306（与 compose 宿主机端口、README、flyway 插件一致）；multipart 文件上限复用 `app.upload.max-bytes`，请求上限额外留出边界开销，正好 10 MB 的文件不再被框架先拒。
+- 补回 `config/SimulationProperties`（`app.simulation.delays.*`、`dev-api-enabled`）：只作为 M4 首次初始化 `simulation_config` 的输入，运行期仍只读表（见 D5）。
+- `GlobalExceptionHandler` 新增 `HttpMediaTypeNotSupportedException → 415`、`HttpRequestMethodNotSupportedException → 405`，不再落到兜底 500。
+- 上传落盘后写库失败时删除文件（`StorageService.deleteQuietly`），避免孤儿素材。
+- 测试：新增 `WebConfigTest`（放行清单）、`SimulationPropertiesTest`（绑定与默认值）、非 multipart→415、405、MockMvc 413、写库失败清理。
+- 文档：README 补 `gate-m2.1`、本地 DB 默认值说明与 dev 接口风险提示；`requirements.md` 头部版本对齐 v1.1；`pic/` 标记为本地参考并加入 `.gitignore`。
+
+验证：
+- 容器内 `mvn -B test` → 39 tests, 0 failures。
+- 重建 dev 后端后：`POST /api/materials`（JSON）→ 415 JSON；`POST /api/templates` → 405 JSON；上传 PNG → 201；容器网络内 11 MB → 413 JSON。
+
+过程修正：
+- `docs/status` 在首个提交 `ab1e371` 就把 G0～G2 写成"通过"（G1/G2 早于对应代码提交）；`gate-m1`/`gate-m2` 标签所指提交也不含当次完成记录，证据到 `d3ca83b` 才补齐，晚于标签。历史不改写；后续门按计划 14.3/15.4 执行"文档提交 → 打标签"。本次修正建议单独打 `gate-m2.2`。

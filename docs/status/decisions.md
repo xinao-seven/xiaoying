@@ -28,3 +28,17 @@
 - 备选：只读 `app.simulation.delays.*`；只读数据库；两者合并。
 - 结论：运行期只读 `simulation_config` 单例表；`app.simulation.delays.*` 只在 M4 首次初始化该表时使用。`SimulationProperties` 因此推迟到 M4 与初始化逻辑一起实现，M1 不引入未使用的配置类。
 - 影响：开发接口改耗时立即对新任务生效；已创建任务的失败计划仍由 `tasks.planned_fail_stage` 快照决定。
+
+## D5 补回 SimulationProperties：只作初始化输入（2026-10-28）
+
+- 背景：M1 计划要求 `SimulationProperties`；M1 先推迟（D4）以避免出现两处配置同时生效。
+- 备选：继续不建配置类；让运行期直接读配置类。
+- 结论：新增 `config/SimulationProperties` 绑定 `app.simulation.delays.*` 与 `dev-api-enabled`，仅作为 M4 首次初始化 `simulation_config` 的输入；阶段耗时与失败计划在运行期仍只读表。
+- 影响：配置类存在但不参与运行期读取；M4 初始化必须先判断单例行是否存在，不能覆盖开发接口已修改的值。
+
+## D6 框架级异常映射 415/405（2026-10-28）
+
+- 背景：非 multipart 的 `POST /api/materials` 与不支持的方法原先落入兜底 `Exception` 处理器，返回 500。
+- 备选：保持 500；把两者都映射成 400。
+- 结论：新增 `UNSUPPORTED_MEDIA_TYPE`(415) 与 `METHOD_NOT_ALLOWED`(405) 错误码，并在 `GlobalExceptionHandler` 中映射 Spring 的 `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException`；上传文件类型错误仍用 `MATERIAL_MIME_NOT_ALLOWED`。
+- 影响：客户端错误不再显示为服务端错误；错误体结构与其他接口一致。

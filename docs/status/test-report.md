@@ -50,3 +50,14 @@
 | 2 | `curl http://localhost:8080/actuator/health` | 200 `{"status":"UP"}` |
 | 3 | 登录 demo + 模板列表 + 上传 PNG | 200 / 6 条 / 201 `image/png 720×540`，`createdAt=2026-10-28T04:08:59.594Z`（毫秒） |
 | 4 | `docker compose ... port mysql 3306` | `0.0.0.0:13306`，不与宿主机 3306 上的其他服务冲突 |
+
+## M2 后审查修正复跑（2026-10-28）
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps backend mvn -B test` | 39 tests, 0 failures, 0 errors（新增 `WebConfigTest` 1、`SimulationPropertiesTest` 2；`MaterialControllerTest` 6、`MaterialUploadServiceTest` 9、`TemplateControllerTest` 6） |
+| 2 | `POST /api/materials` + `Content-Type: application/json` | 415 `UNSUPPORTED_MEDIA_TYPE`，JSON 含 `traceId` |
+| 3 | `POST /api/templates` | 405 `METHOD_NOT_ALLOWED`，JSON 含 `traceId` |
+| 4 | 上传 720×540 PNG（demo 会话） | 201；`image/png`、`width=720`、`height=540` |
+| 5 | 容器网络内上传 11 MB 文件 | 413 `PAYLOAD_TOO_LARGE` JSON（应用侧毫秒级返回） |
+| 6 | 上传 10,240,000 B 随机文件 | 415：大小在 10 MB 以内，按文件头拒绝（证明框架大小限制未误伤边界文件） |

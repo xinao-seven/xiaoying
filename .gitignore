@@ -17,6 +17,9 @@ results/
 *.log
 .tmp/
 
+# 本地参考 UI 截图，不参与构建与交付
+pic/
+
 # env
 .env
 .env.local

@@ -25,5 +25,8 @@
 |---|---|---|
 | G0 | 通过 | commit `ab1e371`；`npm ci && npm run build` 成功；`mvn -B -DskipTests package` 成功；`flyway:info` 连上 MySQL 8.4 并列出 7 个待执行迁移 |
 | G1 | 通过 | commit `9f9a6b9`；`./mvnw -B verify` 33 个测试全绿；curl 登录/登出/me 与 Cookie 属性符合；清空卷后重启应用自动完成 V1～V7 |
-| G2 | 通过 | commit `2a289cc`；`GET /api/templates` 返回 6 条；分类筛选 2 条；上传 PNG 201 且落盘；用户 B 取 A 素材 404；伪造 PNG 415；11 MB 上传 413 JSON |
+| G2 | 通过 | commit `2a289cc`；`GET /api/templates` 返回 6 条；分类筛选 2 条；上传 PNG 201 且落盘；用户 B 取 A 素材 404；伪造 PNG 415；11 MB 上传 413 JSON；毫秒精度修复复跑见 `gate-m2.1`（`aa43e72`） |
+| G2.1 | 通过（审查修正复跑） | 39 tests；非 multipart → 415、不支持方法 → 405 均为 JSON；上传写库失败清理孤儿文件；见 `dev-log.md`「M2 后审查修正」与 `test-report.md` 对应小节。未单独打 tag，建议以 `gate-m2.2` 标记本次修正 |
 | G3 | 未开始 | — |
+
+> 注：G0～G2 的「通过」行在首个提交 `ab1e371` 即已写入（G1/G2 早于对应代码提交），commit 证据到 `d3ca83b` 才补齐，晚于 `gate-m1`/`gate-m2` 标签。历史不改写；后续门按计划 14.3/15.4 执行「文档提交 → 打标签」。
