@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -12,7 +13,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.xiaoying.auth.AuthUser;
 import com.xiaoying.auth.CurrentUserArgumentResolver;
 import com.xiaoying.common.ApiException;
-import com.xiaoying.common.ApiError;
 import com.xiaoying.common.ErrorCode;
 import com.xiaoying.common.GlobalExceptionHandler;
 import java.nio.file.Files;
@@ -24,8 +24,6 @@ import org.junit.jupiter.api.io.TempDir;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
-import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -113,15 +111,26 @@ class MaterialControllerTest {
     }
 
     @Test
-    void oversizedUploadMapsToJson413() {
-        GlobalExceptionHandler handler = new GlobalExceptionHandler();
+    void oversizedUploadMapsToJson413() throws Exception {
+        when(materialService.upload(any(), any()))
+                .thenThrow(new MaxUploadSizeExceededException(10 * 1024 * 1024));
 
-        ResponseEntity<ApiError> response = handler.handleMaxUploadSize(
-                new MaxUploadSizeExceededException(10 * 1024 * 1024), new MockHttpServletRequest());
+        mockMvc.perform(multipart("/api/materials")
+                        .file(new MockMultipartFile("file", "big.png", "image/png", new byte[]{1, 2, 3})))
+                .andExpect(status().isPayloadTooLarge())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("PAYLOAD_TOO_LARGE"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
 
-        org.assertj.core.api.Assertions.assertThat(response.getStatusCode().value()).isEqualTo(413);
-        org.assertj.core.api.Assertions.assertThat(response.getBody()).isNotNull();
-        org.assertj.core.api.Assertions.assertThat(response.getBody().code()).isEqualTo("PAYLOAD_TOO_LARGE");
-        org.assertj.core.api.Assertions.assertThat(response.getBody().traceId()).isNotEmpty();
+    @Test
+    void nonMultipartUploadReturnsJson415() throws Exception {
+        mockMvc.perform(post("/api/materials")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 }

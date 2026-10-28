@@ -9,6 +9,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.FieldError;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -33,7 +35,19 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ApiError> handleMaxUploadSize(MaxUploadSizeExceededException ex, HttpServletRequest request) {
-        return build(ErrorCode.PAYLOAD_TOO_LARGE, "上传文件超过大小限制（最大 10 MB）", null, request);
+        return build(ErrorCode.PAYLOAD_TOO_LARGE, "上传文件超过大小限制", null, request);
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiError> handleUnsupportedMediaType(HttpMediaTypeNotSupportedException ex,
+                                                               HttpServletRequest request) {
+        return build(ErrorCode.UNSUPPORTED_MEDIA_TYPE, "不支持的请求内容类型", null, request);
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ApiError> handleMethodNotAllowed(HttpRequestMethodNotSupportedException ex,
+                                                           HttpServletRequest request) {
+        return build(ErrorCode.METHOD_NOT_ALLOWED, "不支持的请求方法", null, request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

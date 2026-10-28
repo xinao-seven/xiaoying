@@ -3,6 +3,7 @@ package com.xiaoying.template;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -91,6 +92,14 @@ class TemplateControllerTest {
         mockMvc.perform(get("/api/templates/nope"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("TEMPLATE_NOT_FOUND"))
+                .andExpect(jsonPath("$.traceId").isNotEmpty());
+    }
+
+    @Test
+    void unsupportedMethodReturns405Json() throws Exception {
+        mockMvc.perform(post("/api/templates"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
                 .andExpect(jsonPath("$.traceId").isNotEmpty());
     }
 }
