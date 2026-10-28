@@ -9,7 +9,27 @@ import reducer, {
 } from "@/store/tasksSlice";
 import { makeTask } from "@/test/fixtures";
 
-describe("tasksSlice（TC-FE-06 版本合并）", () => {
+describe("tasksSlice（TC-FE-01/06 版本合并）", () => {
+  it("多任务按 id 独立合并，版本与状态互不串扰（TC-FE-01）", () => {
+    const first = makeTask({ createdAt: "2026-10-28T09:00:00.000Z", version: 2, status: "PROCESSING" });
+    const second = makeTask({ createdAt: "2026-10-28T10:00:00.000Z", version: 5, status: "PENDING" });
+
+    let state = reducer(initialState, upsertMany([first, second]));
+    state = reducer(
+      state,
+      upsertMany([
+        { ...first, version: 3, stage: "GENERATING" },
+        { ...second, version: 1, status: "PENDING" },
+      ]),
+    );
+
+    expect(state.order).toEqual([second.id, first.id]);
+    expect(state.byId[first.id]?.version).toBe(3);
+    expect(state.byId[first.id]?.stage).toBe("GENERATING");
+    expect(state.byId[second.id]?.version).toBe(5);
+    expect(state.byId[second.id]?.status).toBe("PENDING");
+  });
+
   it("按创建时间倒序插入新任务", () => {
     const older = makeTask({ createdAt: "2026-10-28T09:00:00.000Z" });
     const newer = makeTask({ createdAt: "2026-10-28T11:00:00.000Z", version: 2, status: "PROCESSING" });
