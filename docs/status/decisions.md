@@ -70,3 +70,17 @@
 - 备选：复制原图；调用外部图像服务；Java2D 本地拼图。
 - 结论：`GENERATING` 用 Java2D 生成 1200×800 拼图，`ASSEMBLING` 编码 PNG 写入 `{APP_DATA_DIR}/results/{taskId}.png`，数据库存 `/api/tasks/{id}/result`；读取前校验 `SUCCEEDED` 与归属。
 - 影响：无外网依赖；图片尺寸与布局固定；中文字体依赖运行环境，缺失时回退英文标题，不影响结果文件。
+
+## D11 前端状态管理：Redux Toolkit + 页面级轮询（2026-10-28）
+
+- 背景：需要按任务 id 归一化、按 `version` 丢弃晚到响应、区分任务状态与查询错误，并让核心逻辑可单测。
+- 备选：React Context + useReducer、Zustand、SWR/React Query、Redux Toolkit。
+- 结论：使用 Redux Toolkit 2.x；`tasks` slice 保存 `byId`、`order`、`sync`，`upsertTask` 在 `incoming.version < existing.version` 时直接丢弃；轮询不放进 store，由页面级 hook 驱动（M7）。
+- 影响：reducer 为纯函数，TC-FE-01/06 可直接覆盖；查询错误只写 `sync`，不会改任务 `status/stage/result`；Provider 在客户端按请求创建 store。
+
+## D12 同源代理与上传：Route Handler 转发 + XHR 进度（2026-10-28）
+
+- 背景：浏览器只能访问 `:3000`，会话 Cookie 为 `HttpOnly`；构建期不能依赖后端；上传需要展示进度。
+- 备选：前端直连 `:8080`（CORS + Cookie 跨站）、Server Actions、Next Route Handler 同源代理。
+- 结论：`app/api/[...path]/route.ts` 把 `/api/*` 转发到 `BACKEND_URL`，逐个透传 `Set-Cookie`，请求体用 `arrayBuffer`；普通接口统一走 `fetch` 包装，上传走 XHR 以获得 `upload.onprogress`；401 统一清 store 并跳登录。
+- 影响：前端代码只使用相对路径；模板页采用 Client Component 取数，`npm run build` 不需要后端；受 Cookie 保护的素材/结果图与 `blob:` 预览使用原生 `<img>`，不经 `next/image` 优化器。

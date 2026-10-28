@@ -2,7 +2,7 @@
 
 浏览模板、上传素材、提交制作任务，任务在 Java 后台按「素材检查 → 模拟生成 → 结果整理」三阶段异步执行，前端可继续浏览并跟踪任务状态与结果。
 
-> 当前进度：M0～M4（版本验证、迁移与认证、模板与素材、任务受理与异步流水线、查询/历史/结果/模拟控制）。前端页面在 M5 接入。
+> 当前进度：M0～M6（版本验证、迁移与认证、模板与素材、任务受理与异步流水线、查询/历史/结果/模拟控制、前端模板页与上传提交流程）。任务跟踪、历史与刷新恢复在 M7 接入；M8 测试与 CI、M9 容器交付待完成。
 
 ## 技术版本
 
@@ -42,9 +42,14 @@
 │   │   └── template/        # 模板分类/列表/详情
 │   └── src/main/resources/db/migration/   # Flyway V1～V7
 ├── frontend/                # Next.js 15 App Router
-│   ├── app/                 # 页面与全局样式
-│   ├── lib/                 # 工具函数
+│   ├── app/                 # 页面、布局、全局样式与 /api 同源代理
+│   ├── components/          # Providers、顶栏
+│   ├── features/            # 登录、模板、上传槽位、提交、任务卡片
+│   ├── store/               # Redux Toolkit tasks slice
+│   ├── lib/                 # API client、类型、上传、格式化
 │   ├── public/demo/         # 自生成示例封面
+│   ├── test/                # Vitest setup、fixtures
+│   ├── middleware.ts        # 无会话 Cookie 时跳登录
 │   └── scripts/             # 封面生成脚本
 ├── docs/                    # 需求、执行计划、完成记录
 ├── pic/                     # 本地参考 UI 截图（不参与构建，不纳入交付）
@@ -121,7 +126,9 @@ npm run dev                # http://localhost:3000
 npm run lint && npm run typecheck && npm test && npm run build
 ```
 
-> 前端开发时把 `BACKEND_URL` 指向 `http://localhost:8080` 即可复用上面的 Docker 后端。
+- 浏览器只访问 `http://localhost:3000`；`app/api/[...path]/route.ts` 把 `/api/*` 代理到 `BACKEND_URL`（默认 `http://127.0.0.1:8080`），并透传 Cookie。
+- 需要指向其他后端时：`BACKEND_URL=http://其它地址:8080 npm run dev`。
+- 模板与详情页在客户端取数，`npm run build` 不依赖后端。
 
 ### 演示账号
 
@@ -143,7 +150,7 @@ npm run lint && npm run typecheck && npm test && npm run build
 docker compose down -v && docker compose up -d mysql
 ```
 
-## 主要接口（M0～M4 已实现）
+## 主要接口（M0～M6 已实现）
 
 | 方法 | 路径 | 认证 | 说明 |
 |---|---|---|---|
@@ -235,14 +242,23 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-dep
 
 当前 103 个测试，覆盖任务创建校验、原子认领、阶段顺序、失败中断、先提交后等待、终态幂等、重启对账、查询只读、历史分页、用户隔离、失败计划快照、Java2D 结果文件。
 
-## 待补充（M5 起）
+前端单测不依赖真实网络与定时器：
 
-- 前端登录、模板页、制作页、跟踪与历史（M5～M7）
+```bash
+cd frontend
+npm run lint && npm run typecheck && npm test && npm run build
+```
+
+当前 26 个测试，覆盖 tasks slice 的 version 合并与查询错误隔离、模板列表异常/空态/分类竞态、模板 404、上传类型与大小校验、单槽重试、预览 URL 回收、提交防重复与受理后立即插入任务。
+
+## 待补充（M7 起）
+
+- 任务跟踪、历史、刷新恢复与结果预览（M7）
 - 测试补齐与 CI（M8）
 - 容器化、README 十六项与演示脚本（M9）
 - 实际投入、取舍、已知限制、AI 使用说明、第三方来源（M9）
 
-## 已知限制（截至 M4）
+## 已知限制（截至 M6）
 
 - 单实例：多实例会重复消费任务；不实现分布式锁。
 - 重启恢复：处理中的任务标记为失败，不实现断点续跑。
@@ -250,6 +266,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-dep
 - 幂等：仅前端防重复提交，无服务端 `Idempotency-Key`。
 - 结果生成：Java2D 模拟拼图，不调用真实 AI；中文标题依赖运行环境字体，缺失时回退英文标题。
 - 开发模拟接口不鉴权，仅限本地/演示环境。
+- 前端任务列表当前只展示本次会话提交的任务；自动轮询、历史恢复与结果预览在 M7 实现。
 
 需求追踪与过程证据见 `docs/status/`。
 
@@ -263,6 +280,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-dep
 | `gate-m2.1` | 上传时间毫秒精度修复复跑 | `aa43e72` |
 | `gate-m3` | 任务受理与异步流水线 | 代码 `b8a8516`；完成记录见本次 docs 提交 |
 | `gate-m4` | 查询、历史、结果与模拟控制 | 代码 `b8a8516`；完成记录见本次 docs 提交 |
+| `gate-m5` | 前端地基与模板页面 | 代码 `05a7d71`、测试 `b8dcfe8`；完成记录见本次 docs 提交 |
+| `gate-m6` | 制作页上传槽位与提交 | 代码 `05a7d71`、测试 `b8dcfe8`；完成记录见本次 docs 提交 |
 
 后端构建、测试与迁移验证使用 `maven:3.9-eclipse-temurin-21` 容器（本机无 JDK），
 前端在 Node 24.18 下验证，CI 与容器镜像将固定 Node 22。

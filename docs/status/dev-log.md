@@ -182,3 +182,62 @@
 - 日常单测改为 `cd backend && ./mvnw -B test`，不需要 Docker/MySQL；容器命令仍保留用于干净环境复现与 CI 等价验证。
 - 因为 dev 后端仍通过 bind mount 与宿主机共用 `backend/target`，测试前仍需停掉 dev 后端（或改用本机 `./mvnw spring-boot:run`）。
 - 用户级环境变量对已经运行的 ZCode/终端进程不生效；新开终端或重启客户端后，`java`/`mvn` 才会直接在 PATH 上。
+
+## 2026-10-28 · M5 前端地基与模板页面（1.5 人日）
+
+目标：同源代理、认证、状态管理与模板浏览跑通，为制作页提供骨架。
+
+完成：
+- `app/api/[...path]/route.ts`：所有 `/api/*` 转发到 `BACKEND_URL`（默认 `http://127.0.0.1:8080`）；透传 `Cookie`、多个 `Set-Cookie`、`Content-Type`；上传用 `arrayBuffer` 转发；后端不可达时返回 502 JSON。
+- `lib/api/client.ts` + `endpoints.ts` + `types.ts`：统一 fetch 包装，非 2xx 解析 `{code,message,fieldErrors,traceId}` 为 `ApiError`；401 由全局处理器清空 store 并跳 `/login?next=…`（登录接口的 401 除外）。
+- `/login`：用户名/密码、提交中禁用、401 文案、`next` 参数安全校验。
+- `app/layout.tsx` + `Providers` + `TopBar`：Redux Provider、产品名、当前用户、登出；`middleware.ts` 仅做“无会话 Cookie 跳登录”的粗判。
+- `store/tasksSlice.ts`：`byId`、`order`（创建时间倒序）、`upsertTask/upsertMany`（`version` 更小直接丢弃）、`setSync`、`resetAll`。
+- `/`：分类栏（含“全部”与数量）、卡片网格、加载骨架、空态、错误重试；分类切换用 `AbortController` + 请求序号丢弃旧响应。
+- `/templates/[id]`：封面、标题、描述、素材要求、上传区、任务侧栏；404 显示“模板不存在”与返回入口；加载失败可重试。
+- 深色主题扩展：按钮、分类 chip、卡片、骨架、详情双栏、上传槽位、任务卡片；375 px 下顶栏换行、详情单栏、无横向滚动。
+
+验证：
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` 全过（26 tests，5 条路由 + middleware）。
+- 浏览器（`localhost:3000`）：demo 登录成功；列表 6 个模板、4 个分类；筛选“宠物写真”得 2 个；连续切换 5 次分类后最终只显示“节日贺卡”且 `aria-pressed=true`。
+- 停后端后刷新：分类与列表均显示错误态与重试入口，无写死卡片；后端恢复后重新加载得到 6 个模板。
+- `/templates/does-not-exist` 显示“模板不存在”和两个返回列表入口。
+- 375×812：`documentElement.scrollWidth=360 < innerWidth=375`，无横向溢出；两个槽位同列（x=12，宽 336）。
+- 登出后跳到 `/login`，直接访问 `/` 被 middleware 重定向回登录页。
+
+偏离与决策：
+- 模板与详情页使用 Client Component 取数，构建期不访问后端，CI 无后端也能 build。
+- 需要会话的结果图、素材图与 `blob:` 预览用原生 `<img>`，不走 `next/image` 优化器（优化器请求不会携带浏览器 Cookie）。见 D12。
+- 顶栏在非 401 的查询错误时保留最后一次已知用户，并显示“服务暂不可用”，避免后端停机被误认为未登录。
+
+问题与修复：
+- 后端停机时顶栏一度显示“去登录”（`me()` 任何失败都清空用户）→ 区分 401 与其他错误，其他错误保留用户并显示服务不可用。
+
+## 2026-10-28 · M6 制作页：上传槽位与提交（2.0 人日）
+
+目标：R-03 的交互全部落地；提交成功后立刻看到任务，而不是停在“提交中”。
+
+完成：
+- `useUploadSlots`：槽位状态机 `EMPTY → SELECTED → UPLOADING → UPLOADED`，失败进入 `ERROR` 可重试；任意态可移除，`UPLOADED` 可替换。
+- 预览：`URL.createObjectURL`，替换/移除/卸载时统一 `revokeObjectURL`；每次选择带请求令牌，旧上传结果与晚到响应不会覆盖新状态。
+- 客户端校验：类型、大小、空文件；错误定位到具体槽位且不发请求；数量由槽位数量与“全部 UPLOADED”约束。
+- 选择即上传：XHR 上传以获取进度；槽位级进度条、失败原因与单独重试。
+- `SubmitPanel`：全部槽位 `UPLOADED` 才可提交；`submitting` 与 `uploading` 分离；`inFlight` ref 防同 tick 重复提交；成功后 `upsertTask` 插入 store、清空提交中状态并显示成功提示；失败保留槽位与标题输入，显示表单级错误。
+- `TaskCard` / `TaskPanel`：提交后立即在详情页右栏显示任务（等待/处理中/成功/失败），结果图用同源受控 URL。
+- 401：全局处理器清空 store 并跳登录，上传与提交共用。
+
+验证：
+- `npm test` 26 passed：`UploadSlot.test.tsx`（6，含类型/大小拦截、单槽重试、预览回收、卸载回收）、`SubmitPanel.test.tsx`（4，含双提交只发一次、成功插入、失败保留、caption）。
+- 浏览器：2 张模板渲染 2 个槽位；错误类型提示“仅支持 JPEG、PNG 格式，当前为 text/plain”；6 MB 文件提示“图片不能超过 5 MB，当前 6 MB”；两种非法选择均未发起上传。
+- 上传两张 PNG（真实 XHR 经同源代理）：`已上传 2/2`、两个 `blob:` 预览、提交按钮启用；替换槽位 1 后预览 URL 改变；移除槽位 2 后恢复空槽、`已上传 1/2`、提交按钮禁用。
+- 停后端后上传槽位 2：仅该槽位显示“后端服务暂不可用，请稍后重试”，槽位 1 仍为已上传；恢复后端后点“重试槽位 2 的上传”成功，两个槽位均 `UPLOADED`。
+- 提交后服务端任务总数 1→2（只新增 1 个），出现“提交成功”提示与任务卡片（旅行明信片/等待处理），按钮恢复可用。
+- 连续点击提交由单元测试断言只调用一次 `createTask`。
+
+偏离与决策：
+- 浏览器自动化环境（IAB）不提供真实文件选择器；验收时在页面内构造 `File` 并通过 `DataTransfer` 赋给 `input[type=file]` 再触发 `change`，仍走真实的组件状态机、XHR、代理与后端。真实点击文件选择器的链路由原生 input + label 与组件测试覆盖。
+- 详情页右栏只展示本次会话提交的任务；历史恢复、自动轮询、结果预览对话框属于 M7。
+
+遗留 / 风险：
+- 提交成功后保留已上传槽位（按钮恢复可用），用户可再次提交；服务端幂等键为 P2，未实现。
+- 预览 URL 与上传请求的回收依赖 `useUploadSlots` 的卸载清理；React StrictMode 下已验证无重复上传（请求令牌按槽位递增）。

@@ -95,3 +95,42 @@
 | 9 | `failNext=0`（持续失败）连续提交两次，再 `failStage=null` | 两次均 FAILED/GENERATING；清空后任务 SUCCEEDED/DONE |
 | 10 | 用户隔离：alice 访问 demo 任务/结果 | 详情 404 `TASK_NOT_FOUND`；结果 404 `TASK_NOT_FOUND`；alice 历史 `total=0` |
 | 11 | 查询只读：20 次查询前后 | API version=6 不变；DB `updated_at` 精确到毫秒不变 |
+
+## G5 前端地基与模板页面（2026-10-28）
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` | lint 0 问题；tsc 0 错误；Vitest 26 passed；Next build 生成 `/`、`/login`、`/templates/[id]`、`/api/[...path]` 与 middleware |
+| 2 | 浏览器 `localhost:3000` 未登录访问 `/` | 307 到 `/login`；登录 demo 后进入列表 |
+| 3 | 列表首屏 | 6 个模板卡片、4 个分类（创意图片 2、宠物写真 2、节日贺卡 1、婚礼情侣 1）；顶栏显示 `Demo User` 与登出按钮 |
+| 4 | 点击“宠物写真” | 卡片 2 个（萌宠写真、多宠合影），按钮 `aria-pressed=true`，状态“共 2 个模板” |
+| 5 | 连续点击 创意图片 → 节日贺卡 → 婚礼情侣 → 宠物写真 → 节日贺卡 | 最终只显示 1 个“节日贺卡”，选中态与列表一致（旧响应未覆盖） |
+| 6 | 停后端 `docker compose ... stop backend` 后刷新 `/` | 分类与列表均进入错误态：“后端服务暂不可用，请稍后重试”，提供“重试/重新加载”，无写死数据 |
+| 7 | 重启后端后刷新 `/` | 恢复 6 个模板；顶栏恢复 `Demo User` |
+| 8 | `/templates/does-not-exist` | 显示“模板不存在”、说明文字与“返回模板列表”入口（404 来自 Java 接口） |
+| 9 | 375×812 详情页 | `innerWidth=375`、`documentElement.scrollWidth=360`，无横向滚动；两个槽位同列（x=12、宽 336）；顶栏换行 |
+| 10 | 登出后访问 `/` | 跳转 `/login`；登录页标题可见 |
+| 11 | 代理登录（`localhost:3000/api/auth/login`） | 错误密码 401 JSON；正确密码 200，`Set-Cookie` 含 `HttpOnly; SameSite=Lax; Path=/; Max-Age=604800`，Cookie 写入 jar 后续请求有效 |
+| 12 | 代理模板接口 | `GET /api/templates` 6 条；`?category=%E5%AE%A0%E7%89%A9%E5%86%99%E7%9C%9F` 返回 `pet-portrait,pet-family`；未知模板 404 |
+
+## G6 上传槽位与提交（2026-10-28）
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `npm test`（UploadSlot / SubmitPanel） | 10 passed：TC-FE-09/10（成功切换、防重复、失败保留）、TC-FE-11/12（类型/大小拦截、单槽重试、预览回收、卸载回收） |
+| 2 | 打开 2 图模板详情 | 渲染“槽位 1/2”，素材要求 2 张、JPEG/PNG、5 MB；未上传时按钮禁用并提示“还有 2 个槽位未上传完成” |
+| 3 | 错误类型（`text/plain`） | 槽位 1 显示“仅支持 JPEG、PNG 格式，当前为 text/plain”，状态“需要重新选择”，未发起上传请求 |
+| 4 | 6 MB PNG（模板上限 5 MB） | 槽位 1 显示“图片不能超过 5 MB，当前 6 MB”，未发起上传请求 |
+| 5 | 上传两张 720×540 PNG | 真实 XHR 经 Next 代理；两槽位“已上传”，`已上传 2/2`，两个 `blob:` 预览，提交按钮启用 |
+| 6 | 替换槽位 1 | 预览 `src` 由旧 `blob:` 变为新 `blob:`（旧 URL 已 revoke，单元测试断言） |
+| 7 | 移除槽位 2 | 槽位 2 恢复空态，`已上传 1/2`，提交按钮禁用 |
+| 8 | 停后端后上传槽位 2 | 仅槽位 2 显示“后端服务暂不可用，请稍后重试”，槽位 1 仍“已上传”，出现“重试槽位 2 的上传” |
+| 9 | 重启后端后点重试 | 仅重传槽位 2，恢复 `已上传 2/2`，无错误提示，提交按钮启用 |
+| 10 | 提交任务 | 服务端 `total` 由 1 增至 2（仅新增 1 个）；出现“提交成功，任务已加入右侧列表”；任务卡片立即出现（旅行明信片/等待处理）；按钮恢复可用 |
+| 11 | 连续点击提交（单元测试） | `createTask` 只调用 1 次（按钮禁用 + `inFlight` ref 双保险） |
+| 12 | 校验失败后的素材保留 | 失败槽位保留文件与预览，其他槽位不受影响；单测断言重试只调用一次对应文件 |
+
+备注：
+- 浏览器自动化环境（IAB）不提供文件选择器，第 3～10 项的选图通过页面内构造 `File` + `DataTransfer` 赋给 `input[type=file]` 并触发 `change` 完成；组件状态机、XHR、同源代理与后端均为真实执行。
+- 浏览器全页截图在 IAB 下存在拼接伪影，布局结论以 `scrollWidth` 测量与视口截图为证据。
+- 联调期间创建的任务保留在本地数据库，不影响仓库内容。
