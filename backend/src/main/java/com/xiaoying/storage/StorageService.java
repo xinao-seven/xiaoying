@@ -41,6 +41,18 @@ public class StorageService {
         return key;
     }
 
+    /**
+     * 删除已写入的文件；用于写入数据库失败时回滚落盘结果。
+     * 删除失败直接忽略，不影响事务回滚或对外错误。
+     */
+    public void deleteQuietly(String key) {
+        try {
+            Files.deleteIfExists(resolve(key));
+        } catch (IOException | RuntimeException ignored) {
+            // 残留文件不影响正确性，留给后续清理
+        }
+    }
+
     public Path resultsDir() {
         Path dir = root.resolve("results");
         try {

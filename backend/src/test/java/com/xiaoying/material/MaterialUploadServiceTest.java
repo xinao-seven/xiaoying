@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -154,6 +155,24 @@ class MaterialUploadServiceTest {
                 .isEqualTo(ErrorCode.MATERIAL_NOT_FOUND);
     }
 
+    @Test
+    void removesStoredFileWhenInsertFails() throws IOException {
+        mapper.failOnInsert = true;
+        byte[] bytes = imageBytes("png", 64, 64, "png");
+        MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", bytes);
+
+        assertThatThrownBy(() -> service.upload("usr_demo", file))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("database unavailable");
+
+        Path userDir = tempDir.resolve("uploads").resolve("usr_demo");
+        assertThat(Files.exists(userDir)).isTrue();
+        try (Stream<Path> entries = Files.list(userDir)) {
+            assertThat(entries.count()).isZero();
+        }
+        assertThat(mapper.rows).isEmpty();
+    }
+
     private static byte[] imageBytes(String formatName, int width, int height, String fileName)
             throws IOException {
         BufferedImage image = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
@@ -165,9 +184,13 @@ class MaterialUploadServiceTest {
     static final class FakeMaterialMapper implements MaterialMapper {
 
         final Map<String, MaterialRow> rows = new HashMap<>();
+        boolean failOnInsert;
 
         @Override
         public void insert(MaterialRow row) {
+            if (failOnInsert) {
+                throw new IllegalStateException("database unavailable");
+            }
             rows.put(row.getId(), row);
         }
 

@@ -85,7 +85,13 @@ public class MaterialService {
         row.setHeight(image.getHeight());
         row.setStatus(STATUS_UPLOADED);
         row.setCreatedAt(now);
-        materialMapper.insert(row);
+        try {
+            materialMapper.insert(row);
+        } catch (RuntimeException ex) {
+            // 落盘成功但写库失败：删除文件，避免留下无主素材
+            storageService.deleteQuietly(storageKey);
+            throw ex;
+        }
 
         return new MaterialDto(id, contentUrl(id), format.mimeType(), bytes.length,
                 image.getWidth(), image.getHeight(), now);
