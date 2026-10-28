@@ -241,3 +241,31 @@
 遗留 / 风险：
 - 提交成功后保留已上传槽位（按钮恢复可用），用户可再次提交；服务端幂等键为 P2，未实现。
 - 预览 URL 与上传请求的回收依赖 `useUploadSlots` 的卸载清理；React StrictMode 下已验证无重复上传（请求令牌按槽位递增）。
+
+## 2026-10-28 · M7 任务跟踪、历史、刷新恢复（2.0 人日）
+
+目标：把异步状态管理全部考点落地——多任务隔离、终态停轮询、查询异常 ≠ 任务失败、晚到响应丢弃、切换用户清理、刷新恢复与结果预览。
+
+完成：
+- `features/tasks/useTaskPolling.ts`：从 store 选 `PENDING/PROCESSING` 的 id；空集合直接返回，不排定时器；链式 `setTimeout` 在上一轮 `Promise.allSettled` 结束后再排下一轮；每个任务各自查询并合并；失败只 `setSync('error')`，保留 `status/stage/result`；终态使活跃集合变化，effect 清理统一 `abort + clearTimeout`；卸载、登出、`resetAll` 均走同一路径。`fetchTask/schedule/cancel` 可注入，测试不依赖真实网络与定时器。
+- `useTaskHistory` + `TaskSync`：布局层首屏并发拉 `GET /api/tasks?page=0&size=50` 与 `/api/tasks/active`，写入 store 后由轮询继续；登录页不请求任务接口；历史失败保留已加载任务并给出重试。`TaskSync` 同时向页面提供 `refresh/reloadHistory/historyState`。
+- `TaskCard`：等待/处理中（阶段文案 + 三阶段轨迹）/成功（结果图）/失败（失败阶段 + 原因）/查询异常（虚线提示 + 重试）分别渲染；结果图 `onError` 只显示占位，不改任务状态。
+- `ResultDialog`：等价对话框实现（遮罩、`role=dialog`、Esc 关闭、焦点移入关闭按钮并在关闭后返回触发按钮、滚动锁定）。
+- `/history`：状态统计、刷新列表、加载骨架、空态、错误重试；详情页右栏复用 `TaskPanel` 显示同一数据源。
+- 切换用户：登录成功与登出都 `resetAll()`；轮询 cleanup 负责 abort 在途请求。
+- 顶栏新增“历史”入口；`README` 更新路由、测试数与已知限制。
+
+验证：
+- `cd frontend && npm run lint && npm run typecheck && npm test && npm run build`：lint 0、tsc 0、46 tests、6 条路由（新增 `/history`）。
+- 浏览器（`127.0.0.1:3100`，3000 被本机其他应用占用）：3 个任务同时存在时 1 处理中 + 2 等待，状态/阶段/结果互不串扰；全部终态后 6 秒内代理日志无新增任务查询；处理中刷新 `/history` 后历史恢复且阶段继续推进；停后端 6 秒卡片保留 `PROCESSING/GENERATING` 并出现“状态刷新失败 + 重试”，重启后自动恢复并收口为 `FAILED/SERVER_RESTART`；alice 登录后历史为空，访问 demo 任务详情/结果/事件均 404；结果对话框可打开、焦点在关闭按钮、关闭后无残留；375 px 下 `scrollWidth=375` 无横向溢出。
+
+偏离与决策：
+- 每轮按任务并发 `GET /api/tasks/{id}`，不调用 `/active` 批量接口：单任务失败可精确落到该任务的 `sync`，且版本合并逻辑不变。见 D13。
+- 查询异常后不停止轮询，固定 2 秒重试；卡片仍显示最后一次成功快照，恢复后自动继续，符合演示预期。
+- 历史首屏固定 50 条单页，不做分页/无限滚动；M8 若补分页，先扩展 `useTaskHistory`。
+- 对话框没有使用原生 `<dialog>`：`showModal` 在 jsdom 不可用，自绘实现便于单测焦点与 Esc 行为。
+
+遗留 / 风险：
+- 多标签页各自轮询，无跨标签同步；其它标签新建任务后需“刷新列表”或重新进入历史页。
+- 轮询间隔固定 2 秒，没有指数退避；长时间断网时每 2 秒产生一次失败请求。
+- 失败任务的阶段轨迹只标记失败阶段，不区分“之前的阶段已完成”与“之后未执行”的视觉差异（文案已给出失败阶段）。

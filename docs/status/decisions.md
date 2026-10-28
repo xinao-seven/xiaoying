@@ -84,3 +84,17 @@
 - 备选：前端直连 `:8080`（CORS + Cookie 跨站）、Server Actions、Next Route Handler 同源代理。
 - 结论：`app/api/[...path]/route.ts` 把 `/api/*` 转发到 `BACKEND_URL`，逐个透传 `Set-Cookie`，请求体用 `arrayBuffer`；普通接口统一走 `fetch` 包装，上传走 XHR 以获得 `upload.onprogress`；401 统一清 store 并跳登录。
 - 影响：前端代码只使用相对路径；模板页采用 Client Component 取数，`npm run build` 不需要后端；受 Cookie 保护的素材/结果图与 `blob:` 预览使用原生 `<img>`，不经 `next/image` 优化器。
+
+## D13 任务跟踪：轮询而非 SSE/WebSocket，按任务查询并保留查询错误（2026-10-28）
+
+- 背景：需要跟踪多个异步任务、展示阶段变化、在断网时保留最后状态，并让核心逻辑可单测；题目不要求推送。
+- 备选：SSE、WebSocket、`/api/tasks/active` 批量轮询、逐任务 `GET /api/tasks/{id}` 轮询。
+- 结论：布局层 `TaskSync` + `useTaskPolling` 逐任务并发查询；链式 `setTimeout`（上一轮全部结束再排下一轮，间隔 2 秒）；只对 `PENDING/PROCESSING` 轮询；每个任务的成功/失败分别写 `byId` 与 `sync`；按 `version` 丢弃晚到响应；终态使活跃集合变化，effect 清理 abort 在途请求并取消定时器。
+- 影响：单任务失败能精确显示在对应卡片且不污染其它任务；查询异常与任务失败在 UI 与 store 中彻底分离；轮询语义可用注入的 `fetchTask/schedule/cancel` 直接单测；代价是没有服务端推送，最长 2 秒延迟，且多标签页各自轮询。
+
+## D14 结果预览：自绘对话框而非原生 `<dialog>`（2026-10-28）
+
+- 背景：结果大图需要可关闭的预览，并要求 Esc、焦点返回与滚动锁定。
+- 备选：原生 `<dialog>` + `showModal()`；自绘遮罩 + `role=dialog`。
+- 结论：使用受控的自绘对话框；打开时记录 `document.activeElement` 并聚焦关闭按钮，监听 document 的 Esc，关闭时恢复焦点与 `body.overflow`。
+- 影响：jsdom 不实现 `showModal`，自绘实现可在 Vitest 中直接断言焦点与关闭行为；代价是需要自行维护焦点返回，未实现完整的焦点陷阱（Tab 仍可离开对话框）。
