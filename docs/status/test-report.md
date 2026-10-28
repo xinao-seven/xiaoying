@@ -157,3 +157,76 @@
 - 本次浏览器验收将前端跑在 `127.0.0.1:3100`：本机 3000 端口被其它应用占用；`BACKEND_URL` 仍为 `http://127.0.0.1:8080`。
 - 任务用 `curl` 以 demo 会话创建（IAB 无文件选择器），浏览器侧只负责跟踪、刷新、断网与用户隔离；创建、上传与流水线均为真实后端执行。
 - 验收后模拟耗时已恢复默认 800/2500/800 ms，`failStage` 清空。
+
+## G8 CI 与全量用例矩阵（2026-10-28）
+
+### 流水线
+
+`.github/workflows/ci.yml` 三个 job：
+
+| job | 步骤 | 依赖服务 |
+|---|---|---|
+| `frontend` | `npm ci` → lint → typecheck → test → build | 无后端、无数据库 |
+| `backend` | `./mvnw -B verify` | 无数据库（单测全 fake） |
+| `migration-smoke` | Flyway migrate → validate → 种子/认领 SQL 冒烟 | MySQL 8.4 service container |
+
+迁移冒烟脚本：`scripts/ci/migration-smoke.sh`，校验用户=2、启用模板≥6、`simulation_config` 有单例行、三张任务表存在，并验证条件更新认领一次成功/二次 0 行、终态不可回退。CI 通过 `mysql:8.4` 客户端容器执行同一脚本。
+
+### 连续三次本地等价运行（无 GitHub 远端，无法实际触发 Actions）
+
+| # | 命令 | 第 1 次 | 第 2 次 | 第 3 次 |
+|---|---|---|---|---|
+| 1 | `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` | 46 tests / 6 路由 | 46 tests / 6 路由 | 46 tests / 6 路由 |
+| 2 | `cd backend && ./mvnw -B verify` | 103 tests, 0 失败 | 103 tests, 0 失败 | 103 tests, 0 失败 |
+| 3 | 清库 → `flyway:migrate` → `flyway:validate` → `migration-smoke.sh` | OK | OK | OK |
+
+三遍均无 flaky；测试不依赖真实网络、真实 sleep 或随机数（后端 fake sleeper/clock，前端注入 fetcher/scheduler）。
+
+### 后端用例矩阵（TC-BE-01～22）
+
+| 用例 | 测试类 / 方法 | 结果 |
+|---|---|---|
+| TC-BE-01 三阶段顺序 + 成功 | `TaskPipelineRunnerTest.completesThreeStagesInOrderAndMarksSucceeded` | 通过 |
+| TC-BE-02/03/04 各阶段失败中断 | `TaskPipelineRunnerTest.plannedFailureStopsAtTargetStage`（3 参数） | 通过 |
+| TC-BE-05 失败原因持久化 | `TaskPipelineRunnerTest.plannedFailureStopsAtTargetStage`（断言 failedStage/errorCode/message） | 通过 |
+| TC-BE-06 终态幂等 | `TaskPipelineRunnerTest.terminalTaskIsIdempotent`、`terminalFailedTaskIsNotReprocessed` | 通过 |
+| TC-BE-07 先提交后等待 | `TaskPipelineRunnerTest.stageIsCommittedBeforeSleep` | 通过 |
+| TC-BE-08 查询只读 | `TaskQueryServiceTest.queriesAreReadOnly` | 通过 |
+| TC-BE-09/10/11 数量/MIME/大小 | `TaskCreateServiceTest.rejectsWrongMaterialCount`、`rejectsMimeOutsideTemplateList`、`rejectsMaterialOverTemplateLimit` | 通过 |
+| TC-BE-12 素材归属 → 404 | `TaskCreateServiceTest.rejectsMaterialOwnedByAnotherUser` | 通过 |
+| TC-BE-13 模板不存在 | `TaskCreateServiceTest.rejectsMissingTemplate` | 通过 |
+| TC-BE-14 参数非法 | `TaskCreateServiceTest.rejectsUnknownParams` 等 6 个校验用例 | 通过 |
+| TC-BE-15 并发认领唯一 | `TaskClaimServiceTest.concurrentClaimsOnlyOneSucceeds`、`firstClaimWinsAndSecondLoses` | 通过 |
+| TC-BE-16 未捕获异常兜底 | `TaskPipelineRunnerTest.unexpectedExceptionIsPersistedAsInternalError` | 通过 |
+| TC-BE-17 结果文件生成 | `Java2dResultComposerTest.storesPngAndReturnsResultUrl`、`corruptedMaterialFailsAsUnreadable` | 通过 |
+| TC-BE-18 多任务隔离 | `TaskPipelineRunnerTest.twoTasksDoNotInterfere` | 通过 |
+| TC-BE-19 历史排序分页 | `TaskQueryServiceTest.historyIsNewestFirstAndPaged`、`paginationRejectsInvalidValues` | 通过 |
+| TC-BE-20 用户隔离 | `TaskQueryServiceTest.userIsolationReturns404ForOtherUsersTask`、`resultIsAvailableOnlyForSucceededTask` | 通过 |
+| TC-BE-21 重启对账 | `RestartReconcilerTest.marksProcessingTaskFailedAndKeepsPendingClaimable` | 通过 |
+| TC-BE-22 PENDING 可恢复 | `RestartReconcilerTest.marksProcessingTaskFailedAndKeepsPendingClaimable`（PENDING 保持 + 可认领）、`reconcileIsIdempotent` | 通过 |
+| 补充 登录/会话 | `AuthControllerTest` 7、`SessionServiceTest` 4 | 通过 |
+| 补充 413/415/不可解码 | `MaterialControllerTest` 6、`MaterialUploadServiceTest` 9 | 通过 |
+| 补充 模拟单一来源 | `SimulationServiceTest` 12、`DevSimulationControllerTest` 3 | 通过 |
+
+### 前端用例矩阵（TC-FE-01～16）
+
+| 用例 | 测试文件 / 用例 | 结果 |
+|---|---|---|
+| TC-FE-01 多任务隔离 | `tasksSlice.test.ts`「多任务按 id 独立合并」、`useTaskPolling.test.tsx`「多任务各自合并」 | 通过 |
+| TC-FE-02 查询异常 ≠ 失败 | `useTaskPolling.test.tsx`「查询失败只写 sync」、`TaskCard.test.tsx`「查询异常只追加提示」 | 通过 |
+| TC-FE-03 失败与同步错误区分 | `TaskCard.test.tsx`「失败任务展示失败阶段与原因」「查询异常只追加提示」 | 通过 |
+| TC-FE-04 终态停跟踪 | `useTaskPolling.test.tsx`「任务到达终态后停止轮询」 | 通过 |
+| TC-FE-05 无活跃不轮询 | `useTaskPolling.test.tsx`「无活跃任务时不发请求也不排定时器」 | 通过 |
+| TC-FE-06 晚到响应丢弃 | `tasksSlice.test.ts`「丢弃晚到的旧版本响应」「批量合并时逐条应用版本规则」 | 通过 |
+| TC-FE-07 用户切换清理 | `useTaskPolling.test.tsx`「resetAll 会 abort 在途请求」 | 通过 |
+| TC-FE-08 刷新恢复 | `useTaskPolling.test.tsx`「首屏同时拉历史和活跃任务」 | 通过 |
+| TC-FE-09 提交成功/失败 | `SubmitPanel.test.tsx`「成功后立即插入任务」「提交失败保留槽位」 | 通过 |
+| TC-FE-10 防重复提交 | `SubmitPanel.test.tsx`「连续点击只发起一次请求」 | 通过 |
+| TC-FE-11 上传校验 | `UploadSlot.test.tsx`「类型不符」「超过大小上限」 | 通过 |
+| TC-FE-12 失败重试/回收 | `UploadSlot.test.tsx`「单槽重试」「替换与移除回收」「卸载回收」 | 通过 |
+| TC-FE-13 卸载清理 | `useTaskPolling.test.tsx`「卸载时 abort 在途请求」 | 通过 |
+| TC-FE-14 结果图 404 | `TaskCard.test.tsx`「结果图 404 时显示占位」 | 通过 |
+| TC-FE-15 列表异常/空态/竞态 | `TemplateList.test.tsx` 前 3 个用例 | 通过 |
+| TC-FE-16 模板 404 | `TemplateList.test.tsx`「模板不存在」「详情加载失败可重试」 | 通过 |
+
+> 说明：本仓库尚未配置 GitHub 远端，`ci.yml` 只做了 YAML 解析校验与本地等价运行；推送后需在 Actions 页面确认三 job 首次全绿，并连续触发 3 次。README 的 CI 徽章地址中的 `OWNER/REPOSITORY` 需在推送后替换。

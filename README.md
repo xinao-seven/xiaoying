@@ -2,6 +2,10 @@
 
 浏览模板、上传素材、提交制作任务，任务在 Java 后台按「素材检查 → 模拟生成 → 结果整理」三阶段异步执行，前端可继续浏览并跟踪任务状态与结果。
 
+[![CI](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml/badge.svg)](https://github.com/OWNER/REPOSITORY/actions/workflows/ci.yml)
+
+> 仓库尚未配置远端；推送后请把徽章与链接中的 `OWNER/REPOSITORY` 替换为实际地址。
+
 > 当前进度：M0～M7（版本验证、迁移与认证、模板与素材、任务受理与异步流水线、查询/历史/结果/模拟控制、前端模板页、上传提交流程、任务跟踪与刷新恢复）。M8 测试与 CI、M9 容器交付待完成。
 
 ## 技术版本
@@ -251,6 +255,37 @@ npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 当前 46 个测试，覆盖 tasks slice 的 version 合并与查询错误隔离、多任务并行跟踪、终态停止轮询、晚到响应丢弃、卸载/切用户 abort、刷新恢复、任务卡片四类状态、结果图 404 占位与预览对话框、模板列表异常/空态/分类竞态、模板 404、上传类型与大小校验、单槽重试、预览 URL 回收、提交防重复与受理后立即插入任务。
+
+## 持续集成
+
+`.github/workflows/ci.yml` 在 push、pull request 与手动触发时运行三个 job：
+
+| job | 内容 | 是否需要数据库 |
+|---|---|---|
+| `frontend` | `npm ci` → lint → typecheck → test → build | 否 |
+| `backend` | `./mvnw -B verify`（103 个单测，全部 fake） | 否 |
+| `migration-smoke` | MySQL 8.4 service → Flyway migrate/validate → 种子与认领 SQL 冒烟 | 是（service container） |
+
+本地等价命令：
+
+```bash
+# frontend
+cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build
+
+# backend
+cd backend && ./mvnw -B verify
+
+# migration-smoke（先启动 compose 的 mysql；脚本用 mysql:8.4 客户端容器执行）
+cd backend && ./mvnw -B org.flywaydb:flyway-maven-plugin:migrate \
+  -Ddb.url='jdbc:mysql://127.0.0.1:13306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+docker run --rm --network xiaoying_default \
+  -e DB_HOST=mysql -e DB_PORT=3306 -e DB_USER=xiaoying \
+  -e DB_PASSWORD=xiaoying -e DB_NAME=xiaoying \
+  -v "$PWD/../scripts/ci:/scripts:ro" mysql:8.4 \
+  bash /scripts/migration-smoke.sh
+```
+
+迁移冒烟脚本校验：2 个种子用户、≥6 个启用模板、`simulation_config` 单例行、三张任务表存在，以及“PENDING 只能被条件更新认领一次、终态不可回退”。
 
 ## 待补充（M8 起）
 

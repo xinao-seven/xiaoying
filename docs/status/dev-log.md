@@ -269,3 +269,28 @@
 - 多标签页各自轮询，无跨标签同步；其它标签新建任务后需“刷新列表”或重新进入历史页。
 - 轮询间隔固定 2 秒，没有指数退避；长时间断网时每 2 秒产生一次失败请求。
 - 失败任务的阶段轨迹只标记失败阶段，不区分“之前的阶段已完成”与“之后未执行”的视觉差异（文案已给出失败阶段）。
+
+## 2026-10-28 · M8 测试补齐与 CI（1.5 人日）
+
+目标：把既有 46 + 103 个测试固化成可重复门禁，补上迁移/种子的真实数据库冒烟。
+
+完成：
+- `.github/workflows/ci.yml`：`frontend`（Node 22 + npm cache）、`backend`（Temurin 21 + Maven cache）、`migration-smoke`（MySQL 8.4 service + Flyway + SQL 冒烟）三个 job；push/PR/手动触发，按分支取消旧运行。
+- `scripts/ci/migration-smoke.sh`：校验种子（用户 2、启用模板 6、`simulation_config` 1）、三张任务表存在；插入 PENDING → 条件更新认领成功 1 行 → 重复认领 0 行；SUCCEEDED 后再按 `status='PROCESSING'` 更新 0 行。
+- `.gitattributes`：脚本/SQL/YAML 强制 LF；修正 `backend/mvnw` 的 git 可执行位，保证 Linux CI 可直接 `./mvnw`。
+- `test-report.md` 补全 TC-BE-01～22、TC-FE-01～16 的“用例 → 测试类/方法 → 结果”矩阵与三遍运行记录。
+- `README.md` 增加 CI 徽章、三 job 说明与本地等价命令；requirements-status 更新 R-12 与 G8。
+
+验证（连续三次）：
+- 前端：lint 0、typecheck 0、46 tests、build 6 路由，三次一致。
+- 后端：`mvn -B verify` 103 tests、0 失败，三次一致。
+- 迁移冒烟：每次重建 `xiaoying_ci` 库 → `flyway:migrate` 7 个迁移 → `flyway:validate` → 脚本全 PASS，三次一致。
+
+偏离与决策：
+- 本地 Maven 用完全限定 goal（`org.flywaydb:flyway-maven-plugin:migrate`）而不是 `flyway:migrate`：本机仓库缺少前缀元数据时后者会报 `No plugin found for prefix`；CI 同样使用完全限定形式，避免环境差异。
+- 迁移冒烟 SQL 通过 `mysql:8.4` 容器执行，不在 runner 上安装 mysql 客户端；本地与 CI 共用同一脚本，只改 `DB_HOST/DB_PORT`。
+- 本仓库没有 GitHub 远端，无法实际触发 Actions；G8 记为“本地等价通过，远端待触发”，推送后需确认首次三 job 全绿。
+
+遗留 / 风险：
+- CI 徽章中的 `OWNER/REPOSITORY` 是占位符，推送后必须替换。
+- GitHub Actions 首次运行需要下载 npm/Maven 依赖，耗时会明显高于本地缓存运行。
