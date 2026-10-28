@@ -351,18 +351,20 @@ docker compose up -d --build
 本地等价命令：
 
 ```bash
-cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build
-cd backend && ./mvnw -B verify
+(cd frontend && npm ci && npm run lint && npm run typecheck && npm test && npm run build)
+(cd backend && ./mvnw -B verify)
 
-# 迁移冒烟（先启动 compose 的 mysql）
-cd backend && ./mvnw -B org.flywaydb:flyway-maven-plugin:migrate \
-  -Ddb.url='jdbc:mysql://127.0.0.1:13306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+# 迁移冒烟（先启动 compose 的 mysql；以下命令在仓库根目录执行）
+(cd backend && ./mvnw -B org.flywaydb:flyway-maven-plugin:migrate \
+  -Ddb.url='jdbc:mysql://127.0.0.1:13306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC')
 docker run --rm --network xiaoying_default \
   -e DB_HOST=mysql -e DB_PORT=3306 -e DB_USER=xiaoying \
   -e DB_PASSWORD=xiaoying -e DB_NAME=xiaoying \
   -v "$PWD/scripts/ci:/scripts:ro" mysql:8.4 \
   bash /scripts/migration-smoke.sh
 ```
+
+> Windows Git Bash 下如遇到路径被改写，给 `docker run` 前加 `MSYS_NO_PATHCONV=1`。
 
 > 本仓库未配置 GitHub 远端，Actions 尚未实际触发；G8 记录的是同一组命令在本地连续三次的结果。推送后需确认首次三 job 全绿并替换徽章地址。
 
@@ -394,12 +396,12 @@ docker run --rm --network xiaoying_default \
 
 | 日期 | 阶段 | 内容 | 实际 |
 |---|---|---|---|
-| 2026-10-28 | 需求与方案 | 需求拆解、架构、风险、版本验证 | 约 1.0 h |
-| 2026-10-28 | 后端 | 迁移、认证、模板/素材、任务流水线、查询与模拟 | 约 1.7 h |
-| 2026-10-28 | 前端 | 模板、上传、提交、轮询、历史、结果预览 | 约 1.6 h |
+| 2026-10-28 | 需求与方案 | 需求拆解、架构、风险、版本验证 | 约 0.8 h |
+| 2026-10-28 | 后端 | 迁移、认证、模板/素材、任务流水线、查询与模拟 | 约 1.6 h |
+| 2026-10-28 | 前端 | 模板、上传、提交、轮询、历史、结果预览 | 约 1.5 h |
 | 2026-10-28 | 验证 | 单测、浏览器验收、断网/重启/隔离/小屏 | 约 0.6 h |
-| 2026-10-28 | 交付 | 镜像、Compose、CI、README、文档与标签 | 约 0.9 h |
-| 合计 | | 仓库时间戳跨度约 10:24–15:40 | **约 5.8 h** |
+| 2026-10-28 | 交付 | 镜像、Compose、CI、README、文档与标签 | 约 0.8 h |
+| 合计 | | 仓库时间戳跨度约 10:24–15:40 | **约 5.3 h** |
 
 > 上述为按会话与文件时间戳估算的实际 wall-clock，未逐任务计时；执行计划的估算合计为 16 人日（单人串行），本次在 AI 协作下压缩为单日。若按人日申报，建议以团队实际评审口径为准。
 
