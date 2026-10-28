@@ -61,3 +61,37 @@
 | 4 | 上传 720×540 PNG（demo 会话） | 201；`image/png`、`width=720`、`height=540` |
 | 5 | 容器网络内上传 11 MB 文件 | 413 `PAYLOAD_TOO_LARGE` JSON（应用侧毫秒级返回） |
 | 6 | 上传 10,240,000 B 随机文件 | 415：大小在 10 MB 以内，按文件头拒绝（证明框架大小限制未误伤边界文件） |
+
+## G3 任务受理与异步流水线（2026-10-28）
+
+> 宿主机 `localhost` 可能解析到 `::1` 并被其他进程占用；本节 curl 统一使用 `http://127.0.0.1:8080`。
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `docker compose ... run --rm --no-deps backend mvn -B test` | 103 tests, 0 failures, 0 errors（新增 TaskPipelineRunnerTest 11、TaskCreateServiceTest 13、TaskClaimServiceTest 2、RestartReconcilerTest 2、Java2dResultComposerTest 5、TaskQueryServiceTest 7、SimulationServiceTest 12、DevSimulationControllerTest 3、TaskControllerTest 8、TaskMapperSqlTest 1） |
+| 2 | 登录 demo + 上传 2 张 720×540 PNG | 登录 200；素材 201，`image/png` 40482/40788 B |
+| 3 | `POST /api/tasks`（默认 800/2500/800 ms） | 201，`PENDING`、`version=1`、`stage=null`；轮询观察到 `MATERIAL_CHECK`（v3）→`GENERATING`（v4）→`ASSEMBLING`（v5）→`SUCCEEDED/DONE`（v6） |
+| 4 | `GET /api/tasks/{id}/events` | 7 条：MATERIAL_CHECK/STARTED、SUCCEEDED；GENERATING/STARTED、SUCCEEDED；ASSEMBLING/STARTED、SUCCEEDED；DONE/TASK_SUCCEEDED |
+| 5 | 连续 20 次 `GET /api/tasks/{id}` | API `version=6`、`status/stage` 不变；DB `updated_at=2026-10-28 05:49:34.246` 不变 |
+| 6 | `POST /api/dev/simulation {"failStage":"GENERATING","failNext":1}` 后创建任务 | 201；任务 `FAILED/failedStage=GENERATING/errorCode=SIMULATED_FAILURE`；事件无 ASSEMBLING；结果 404；随后任务成功（计数已消费并清空） |
+| 7 | `{"delayGeneratingMs":8000}` 后创建任务 | 创建 201 用时 13 ms；GENERATING 约 8.0 s；终态总耗时约 10.0 s |
+| 8 | 连续创建 3 个 5 s 任务 | 1 s 后：1 个 PROCESSING（GENERATING）+ 2 个 PENDING；随后 active 3→2→1→0，依次成功 |
+| 9 | 处理中重启后端（生成耗时 60 s） | 重启前 PROCESSING/GENERATING；重启后 `FAILED/failedStage=GENERATING/errorCode=SERVER_RESTART/errorMessage=服务重启导致处理中断`，事件 `STAGE_FAILED` 收口 |
+| 10 | 独立后端实例 `APP_SIMULATION_DEV_API_ENABLED=false` | `GET /api/dev/simulation` → 404 `NOT_FOUND` JSON |
+| 11 | `TaskMapperSqlTest` | 校验注解 SQL 中列清单与 `FROM` 之间有空格，防止文本块拼接回归 |
+
+## G4 查询、历史、结果与模拟控制（2026-10-28）
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | 3 个任务（1 失败 2 成功）`GET /api/tasks?page=0&size=20` | `total=3`、`page=0`、`size=20`；顺序为创建时间倒序（S2、S1、F） |
+| 2 | `page=0&size=2` / `page=1&size=2` | 第一页 S2、S1；第二页 F；两页 `total` 均为 3 |
+| 3 | 全部终态时 `GET /api/tasks/active` | `items=[]`；8 s 任务创建后立即 `active` 只含该任务（PROCESSING/MATERIAL_CHECK） |
+| 4 | 成功任务 `GET /api/tasks/{id}/result` | 200 `image/png`、125046 B、1200×800；`Cache-Control: private, max-age=60` |
+| 5 | 失败任务 `GET /api/tasks/{id}/result` | 404 `TASK_NOT_FOUND` |
+| 6 | `GET /api/tasks/{id}/events` | 事件按 `id` 升序；含 STAGE_STARTED/STAGE_SUCCEEDED/TASK_SUCCEEDED |
+| 7 | `POST {"delayGeneratingMs":8000}` | 创建 201 用时 13 ms；GENERATING 约 8 s；恢复 2500 ms 后正常 |
+| 8 | `failNext=1` 连续提交两次 | 第一次 FAILED/GENERATING；第二次 SUCCEEDED/DONE |
+| 9 | `failNext=0`（持续失败）连续提交两次，再 `failStage=null` | 两次均 FAILED/GENERATING；清空后任务 SUCCEEDED/DONE |
+| 10 | 用户隔离：alice 访问 demo 任务/结果 | 详情 404 `TASK_NOT_FOUND`；结果 404 `TASK_NOT_FOUND`；alice 历史 `total=0` |
+| 11 | 查询只读：20 次查询前后 | API version=6 不变；DB `updated_at` 精确到毫秒不变 |

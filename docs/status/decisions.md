@@ -42,3 +42,31 @@
 - 备选：保持 500；把两者都映射成 400。
 - 结论：新增 `UNSUPPORTED_MEDIA_TYPE`(415) 与 `METHOD_NOT_ALLOWED`(405) 错误码，并在 `GlobalExceptionHandler` 中映射 Spring 的 `HttpMediaTypeNotSupportedException` / `HttpRequestMethodNotSupportedException`；上传文件类型错误仍用 `MATERIAL_MIME_NOT_ALLOWED`。
 - 影响：客户端错误不再显示为服务端错误；错误体结构与其他接口一致。
+
+## D7 异步执行：DB 队列 + 信号量 + 有界线程池（2026-10-28）
+
+- 背景：提交接口必须立即返回；任务状态要持久化、可观察、可恢复；题目不要求真正并行，串行队列即可。
+- 备选：`@Async` 直接提交；MQ/Redis；数据库队列 + 调度器。
+- 结论：`POST /api/tasks` 只插 `PENDING`；`@Scheduled` 轮询，条件更新原子认领，提交到 core=max=`app.pipeline.concurrency` 的有界线程池。调度器用信号量把“已认领未完成”的任务数限制在并发度内，其余保持 `PENDING`；提交被拒绝时回退 `PENDING`。
+- 影响：等待态天然可见；重启可重新拾起 `PENDING`；串行时不会把所有任务都标成 `PROCESSING`。单实例假设，多实例会重复消费。
+
+## D8 失败计划：创建时快照 + 单例表三种状态（2026-10-28）
+
+- 背景：FR-SIM-05 要求失败计划在创建时确定并持久化，配置变更不得影响已创建任务；同时要支持“一次”和“持续”两种注入。
+- 备选：worker 运行时读配置；给 `tasks` 加独立快照表；在 `simulation_config` 上用 `fail_stage` + `fail_remaining` 表达。
+- 结论：任务创建事务内 `SELECT ... FOR UPDATE` 锁 `simulation_config` 单例行，把 `fail_stage` 写入 `tasks.planned_fail_stage`；`fail_remaining>0` 时计数减一，减到 0 同时清空 `fail_stage`；`fail_stage` 非空且 `remaining=0` 表示持续失败；显式 `failStage=null` 清空两者。
+- 影响：一张表同时表达“计数模式/持续失败/已清空”；修改配置不影响已创建任务；worker 只读任务快照。
+
+## D9 阶段证据：阶段字段 + `task_events` 事件表（2026-10-28）
+
+- 背景：验收需要证明阶段顺序、失败中断和“先提交后等待”，而前端只需要当前阶段。
+- 备选：只用 `tasks.stage`；只用事件表；两者并存。
+- 结论：`tasks.stage` 供前端轮询；`task_events` 记录 `STAGE_STARTED/STAGE_SUCCEEDED/STAGE_FAILED/TASK_SUCCEEDED`，按自增 id 升序返回。阶段更新先独立提交，再 sleep，再执行工作。
+- 影响：多一张表和每阶段写事件的开销；换来可追溯的阶段证据和 TC-BE-01～07 的可验证性。
+
+## D10 结果生成：Java2D 拼图 + 受控下载（2026-10-28）
+
+- 背景：题目不要求真实 AI，但结果必须可预览、可刷新后恢复。
+- 备选：复制原图；调用外部图像服务；Java2D 本地拼图。
+- 结论：`GENERATING` 用 Java2D 生成 1200×800 拼图，`ASSEMBLING` 编码 PNG 写入 `{APP_DATA_DIR}/results/{taskId}.png`，数据库存 `/api/tasks/{id}/result`；读取前校验 `SUCCEEDED` 与归属。
+- 影响：无外网依赖；图片尺寸与布局固定；中文字体依赖运行环境，缺失时回退英文标题，不影响结果文件。

@@ -4,16 +4,16 @@
 
 | 需求 | 状态 | 证据 | 测试 | 备注 |
 |---|---|---|---|---|
-| R-01 技术栈与职责 | 进行中 | `backend/pom.xml`（Boot 3.5.16 / MyBatis 3.0.5 / MySQL 8.4）、`frontend/package.json`（Next 15.5.28 / React 19.2.9 / TS 5.9.3）；模板与素材接口由 Java 提供 | `npm run build`、`mvn -B test` | 技术栈与职责已落地；任务接口 M3/M4 |
+| R-01 技术栈与职责 | 进行中 | `backend/pom.xml`（Boot 3.5.16 / MyBatis 3.0.5 / MySQL 8.4）、`frontend/package.json`（Next 15.5.28 / React 19.2.9 / TS 5.9.3）；模板、素材、任务、模拟接口均由 Java 提供 | `npm run build`、`mvn -B test` | 后端业务接口已落地；前端页面 M5～M7 |
 | R-02 模板列表与模拟数据 | 进行中 | `GET /api/templates`、`/categories`、`/{id}`；`V7__seed_demo.sql`（4 分类 6 模板） | `TemplateControllerTest`、`TemplateServiceTest` | 后端完成；前端列表 M5 |
 | R-03 详情、上传与校验 | 进行中 | `POST /api/materials`、`GET /api/materials/{id}/content`；落盘 `uploads/{userId}/{uuid}.{ext}` | `MaterialUploadServiceTest`、`MaterialControllerTest` | 后端完成；槽位状态机 M6 |
-| R-04 受理与异步执行 | 未开始 | — | — | M3 |
-| R-05 多步骤状态与查询 | 未开始 | — | — | M3/M4 |
-| R-06 失败与模拟控制 | 未开始 | — | — | M4 |
+| R-04 受理与异步执行 | 完成 | `POST /api/tasks`、`TaskCreateService`、`TaskDispatcher`、`TaskPipelineRunner`；8 s 生成配置下创建接口 13 ms 返回 201 | `TaskCreateServiceTest`、`TaskClaimServiceTest`、`TaskPipelineRunnerTest`、`RestartReconcilerTest` | 串行默认；信号量把在飞任务限制在并发度内，其余保持 PENDING |
+| R-05 多步骤状态与查询 | 完成 | 阶段先提交后等待；`task_events` 记录 STARTED/SUCCEEDED/FAILED；查询只读 | `TaskPipelineRunnerTest`（TC-BE-01～08/18）、`TaskQueryServiceTest` | 事件接口 `/api/tasks/{id}/events`；结果图 1200×800 |
+| R-06 失败与模拟控制 | 完成 | `GET/POST /api/dev/simulation`；创建时快照 `tasks.planned_fail_stage`；计数/持续失败两种模式 | `SimulationServiceTest`、`DevSimulationControllerTest`、TC-BE-02～05 | 默认关闭，dev compose 开启；关闭时 404 |
 | R-07 状态表达与请求异常 | 未开始 | — | — | M7 |
 | R-08 多任务与查询生命周期 | 未开始 | — | — | M7 |
-| R-09 刷新恢复与结果记录 | 未开始 | — | — | M4/M7 |
-| R-10 身份与个人记录 | 进行中 | `/api/auth/login`、`/logout`、`/me`；`V1__users_sessions.sql`；`V7__seed_demo.sql`；素材越权 404 | `SessionServiceTest`、`AuthControllerTest`、`MaterialUploadServiceTest` | 认证与素材归属完成；任务查询隔离 M3/M4 |
+| R-09 刷新恢复与结果记录 | 后端完成 | `GET /api/tasks`、`/active`、`/{id}/result`、`/{id}/events`；结果仅成功且本人可读 | `TaskQueryServiceTest`（TC-BE-19/20） | 前端刷新恢复 M7 |
+| R-10 身份与个人记录 | 进行中 | `/api/auth/*`；素材与任务均按 `user_id` 过滤，越权统一 404 | `SessionServiceTest`、`AuthControllerTest`、`TaskQueryServiceTest` | 后端完成；前端切换用户清理 M7 |
 | R-11 视觉与可用性 | 未开始 | `frontend/app` 深色主题骨架 | — | M5～M7 |
 | R-12 CI 与测试 | 未开始 | — | — | M8 |
 | R-13 提交材料与说明 | 进行中 | `README.md`（版本表、结构、命令、接口、账号、素材来源） | — | 骨架已建；M9 补齐 16 项 |
@@ -27,6 +27,7 @@
 | G1 | 通过 | commit `9f9a6b9`；`./mvnw -B verify` 33 个测试全绿；curl 登录/登出/me 与 Cookie 属性符合；清空卷后重启应用自动完成 V1～V7 |
 | G2 | 通过 | commit `2a289cc`；`GET /api/templates` 返回 6 条；分类筛选 2 条；上传 PNG 201 且落盘；用户 B 取 A 素材 404；伪造 PNG 415；11 MB 上传 413 JSON；毫秒精度修复复跑见 `gate-m2.1`（`aa43e72`） |
 | G2.1 | 通过（审查修正复跑） | 39 tests；非 multipart → 415、不支持方法 → 405 均为 JSON；上传写库失败清理孤儿文件；见 `dev-log.md`「M2 后审查修正」与 `test-report.md` 对应小节。未单独打 tag，建议以 `gate-m2.2` 标记本次修正 |
-| G3 | 未开始 | — |
+| G3 | 通过 | commit `b8a8516`；103 个后端测试全绿；curl：创建 201/13 ms（8 s 生成配置）、PENDING→MATERIAL_CHECK→GENERATING→ASSEMBLING→DONE、查询 20 次 version/updated_at 不变、注入 GENERATING 失败无 ASSEMBLING、重启后残留任务 FAILED/SERVER_RESTART；证据见 `test-report.md` G3 |
+| G4 | 通过 | commit `b8a8516`；3 任务 `total=3` 倒序、`active` 只含非终态、成功结果 200 PNG/失败结果 404、`Cache-Control: private, max-age=60`、8 s 耗时生效、failNext=1 一次失败后恢复、failNext=0 连续失败后清空恢复；证据见 `test-report.md` G4 |
 
 > 注：G0～G2 的「通过」行在首个提交 `ab1e371` 即已写入（G1/G2 早于对应代码提交），commit 证据到 `d3ca83b` 才补齐，晚于 `gate-m1`/`gate-m2` 标签。历史不改写；后续门按计划 14.3/15.4 执行「文档提交 → 打标签」。
