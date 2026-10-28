@@ -4,6 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { login } from "@/lib/api/endpoints";
 import { ApiError } from "@/lib/api/client";
+import { useAppDispatch } from "@/store";
+import { resetAll } from "@/store/tasksSlice";
 
 function safeNext(raw: string | null): string {
   if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/";
@@ -13,6 +15,7 @@ function safeNext(raw: string | null): string {
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const dispatch = useAppDispatch();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -31,6 +34,8 @@ export function LoginForm() {
     setError(null);
     try {
       await login(username.trim(), password);
+      // 换账号登录时先清空上一个会话的任务，避免短暂显示他人记录。
+      dispatch(resetAll());
       router.replace(safeNext(searchParams.get("next")));
       router.refresh();
     } catch (caught) {

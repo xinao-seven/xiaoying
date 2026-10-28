@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { TopBar } from "@/components/TopBar";
+import { TaskSync } from "@/features/tasks/TaskSync";
 
 export const metadata: Metadata = {
   title: "小影素材站",
@@ -17,7 +18,7 @@ export default function RootLayout({
         <Providers>
           <div className="shell">
             <TopBar />
-            {children}
+            <TaskSync>{children}</TaskSync>
           </div>
         </Providers>
       </body>
