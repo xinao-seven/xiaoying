@@ -6,7 +6,8 @@ spring:
   application:
     name: xiaoying-backend
   datasource:
-    url: '${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}'
+    # 与 compose 的宿主机端口（13306）一致；容器内由 SPRING_DATASOURCE_URL 覆盖为 mysql:3306
+    url: '${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:13306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}'
     username: ${SPRING_DATASOURCE_USERNAME:xiaoying}
     password: ${SPRING_DATASOURCE_PASSWORD:xiaoying}
     hikari:
@@ -17,8 +18,10 @@ spring:
     locations: classpath:db/migration
   servlet:
     multipart:
-      max-file-size: 10MB
-      max-request-size: 10MB
+      # 文件上限复用 app.upload.max-bytes，避免两处数值漂移；
+      # 请求上限额外留出 multipart 边界开销，否则正好 10 MB 的文件会被框架先拒掉
+      max-file-size: ${app.upload.max-bytes:10485760}
+      max-request-size: ${APP_UPLOAD_MAX_REQUEST_SIZE:11MB}
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -41,7 +44,8 @@ management:
 app:
   data-dir: ${APP_DATA_DIR:./data}
   upload:
-    max-bytes: 10485760
+    # 全局单文件上限；multipart 的 max-file-size 引用此值
+    max-bytes: ${APP_UPLOAD_MAX_BYTES:10485760}
   pipeline:
     concurrency: ${APP_PIPELINE_CONCURRENCY:1}
     poll-interval-ms: ${APP_PIPELINE_POLL_INTERVAL_MS:1000}
