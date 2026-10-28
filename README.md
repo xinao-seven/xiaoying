@@ -92,6 +92,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml down
 
 ```bash
 cd backend
+./mvnw -B test             # 本机跑单测，不需要 MySQL/Docker
 ./mvnw -q -DskipTests package
 ./mvnw spring-boot:run     # http://localhost:8080
 ./mvnw flyway:info         # 默认连接 localhost:13306

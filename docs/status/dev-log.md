@@ -168,3 +168,17 @@
 
 遗留 / 风险：
 - 开发接口不鉴权，仅限本地/演示环境；生产必须保持 `APP_SIMULATION_DEV_API_ENABLED=false`。
+
+## 2026-10-28 · 本机开发环境补充：JDK 21 + Maven
+
+背景：此前本机没有 JDK，所有后端命令都要通过 `maven:3.9-eclipse-temurin-21` 容器执行，测试命令长且需要先停 dev 后端避免争用 `target/`。
+
+完成：
+- 安装 Eclipse Temurin JDK 21.0.12.1 到 `C:\Users\xinao\jdks\temurin21\jdk-21.0.12.1+1`，设置用户级 `JAVA_HOME` 与 PATH。
+- 安装 Apache Maven 3.9.9 到 `C:\Users\xinao\tools\apache-maven-3.9.9`，并将 `bin` 加入用户级 PATH；同时把 Maven 发行版放入 Maven Wrapper 缓存（`~/.m2/wrapper/dists/apache-maven-3.9.9/3477a4f1`），避免本机 `wget` 访问 Maven Central 返回 502 时 wrapper 无法下载。
+- 本地验证：`cd backend && mvn -B test` → 103 tests, 0 failures；`./mvnw -v` 与 `./mvnw -B test` 也可用。
+
+影响：
+- 日常单测改为 `cd backend && ./mvnw -B test`，不需要 Docker/MySQL；容器命令仍保留用于干净环境复现与 CI 等价验证。
+- 因为 dev 后端仍通过 bind mount 与宿主机共用 `backend/target`，测试前仍需停掉 dev 后端（或改用本机 `./mvnw spring-boot:run`）。
+- 用户级环境变量对已经运行的 ZCode/终端进程不生效；新开终端或重启客户端后，`java`/`mvn` 才会直接在 PATH 上。
