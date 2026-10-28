@@ -8,7 +8,7 @@
 
 | 组件 | 版本 | 说明 |
 |---|---|---|
-| Node.js | 22 LTS（本地验证 24.18.0，CI/容器固定 22） | 前端运行时 |
+| Node.js | 22 LTS（本地验证 24.18.0；M8 CI 与 M9 镜像将固定 22） | 前端运行时 |
 | Next.js | 15.5.28 | App Router |
 | React / React DOM | 19.2.9 | |
 | TypeScript | 5.9.3 | strict |

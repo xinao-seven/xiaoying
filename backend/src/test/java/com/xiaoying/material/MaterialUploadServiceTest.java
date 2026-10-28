@@ -57,6 +57,7 @@ class MaterialUploadServiceTest {
         assertThat(dto.height()).isEqualTo(480);
         assertThat(dto.sizeBytes()).isEqualTo(bytes.length);
         assertThat(dto.url()).isEqualTo("/api/materials/" + dto.id() + "/content");
+        assertThat(dto.createdAt().getNano() % 1_000_000).isZero();
 
         MaterialRow row = mapper.rows.get(dto.id());
         assertThat(row).isNotNull();

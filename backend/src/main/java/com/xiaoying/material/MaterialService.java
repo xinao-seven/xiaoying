@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import javax.imageio.ImageIO;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -71,7 +72,7 @@ public class MaterialService {
 
         String id = Ids.material();
         String storageKey = storageService.storeUpload(userId, bytes, format.extension());
-        Instant now = clock.instant();
+        Instant now = clock.instant().truncatedTo(ChronoUnit.MILLIS);
 
         MaterialRow row = new MaterialRow();
         row.setId(id);

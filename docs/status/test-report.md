@@ -36,3 +36,9 @@
 备注：
 - 11 MB 上传通过容器网络内的 curl 验证（`docker run --network xiaoying_default curlimages/curl`）。宿主机 curl 经 Docker Desktop 端口代理上传超限文件时会挂起，服务端已返回 413；属本机代理现象，应用逻辑由单测 `oversizedUploadMapsToJson413` 覆盖。
 - 分类筛选需使用 UTF-8 URL 编码；Git Bash 直接输入中文会被按本地代码页编码，导致筛选为空。
+
+## gate-m2.1 复跑（2026-10-28）
+
+- 修复：上传响应 `createdAt` 未截断到毫秒，与接口约定（ISO-8601 毫秒）不一致。
+- 变更：`MaterialService` 使用 `Instant.truncatedTo(MILLIS)`；`MaterialUploadServiceTest` 增加纳秒为零的断言。
+- 复跑：`./mvnw -B test` → 33 tests, 0 failures, 0 errors。G2 其余条目不受影响。
