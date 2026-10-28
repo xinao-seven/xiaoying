@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { Providers } from "@/components/Providers";
+import { TopBar } from "@/components/TopBar";
 
 export const metadata: Metadata = {
   title: "小影素材站",
@@ -12,18 +14,12 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body>
-        <div className="shell">
-          <header className="topbar">
-            <div className="brand">
-              <span className="brand-mark" aria-hidden="true">
-                影
-              </span>
-              <span>小影素材站</span>
-            </div>
-            <span className="topbar-meta">模板 · 上传 · 异步制作</span>
-          </header>
-          {children}
-        </div>
+        <Providers>
+          <div className="shell">
+            <TopBar />
+            {children}
+          </div>
+        </Providers>
       </body>
     </html>
   );
