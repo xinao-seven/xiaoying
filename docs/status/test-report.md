@@ -42,3 +42,11 @@
 - 修复：上传响应 `createdAt` 未截断到毫秒，与接口约定（ISO-8601 毫秒）不一致。
 - 变更：`MaterialService` 使用 `Instant.truncatedTo(MILLIS)`；`MaterialUploadServiceTest` 增加纳秒为零的断言。
 - 复跑：`./mvnw -B test` → 33 tests, 0 failures, 0 errors。G2 其余条目不受影响。
+## 开发环境：后端全 Docker（2026-10-28）
+
+| # | 命令/检查 | 结果 |
+|---|---|---|
+| 1 | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait` | `xiaoying-mysql`、`xiaoying-backend-1` 均 healthy；耗时约 2 分钟（首次编译） |
+| 2 | `curl http://localhost:8080/actuator/health` | 200 `{"status":"UP"}` |
+| 3 | 登录 demo + 模板列表 + 上传 PNG | 200 / 6 条 / 201 `image/png 720×540`，`createdAt=2026-10-28T04:08:59.594Z`（毫秒） |
+| 4 | `docker compose ... port mysql 3306` | `0.0.0.0:13306`，不与宿主机 3306 上的其他服务冲突 |

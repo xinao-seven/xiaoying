@@ -22,7 +22,7 @@
 
 偏离与决策：
 - 本机没有 JDK，后端构建/测试/迁移全部在 `maven:3.9-eclipse-temurin-21` 容器中执行；命令写在 README。
-- 宿主机 3306 被其他项目占用，compose 端口改为 `${MYSQL_PORT:-3306}:3306`，本地 `.env` 使用 13306；容器内仍是 `mysql:3306`。
+- 宿主机 3306 被其他项目占用，compose 宿主机端口默认改为 13306（`${MYSQL_PORT:-13306}:3306`），Maven `flyway` 默认 URL 同步改为 `localhost:13306`；容器内始终是 `mysql:3306`。
 - `flyway-maven-plugin` 的 `locations` 增加 `filesystem:src/main/resources/db/migration`，否则插件扫描不到迁移（首次 `flyway:info` 显示 0 个）。
 
 问题与修复：
@@ -69,3 +69,19 @@
 
 问题与修复：
 - 宿主机 curl 上传 11 MB 时 Docker Desktop 端口代理挂起（应用侧从容器网络 4 ms 返回 413），改用容器内 curl 验证；不是应用缺陷。
+## 2026-10-28 · 开发环境全 Docker 化（M0 补充）
+
+目标：本机没有 JDK 也能编译、测试、运行后端，并消除 MySQL 端口冲突。
+
+完成：
+- 新增 `docker-compose.dev.yml`：`maven:3.9-eclipse-temurin-21` + 源码绑定挂载 + `maven-cache`/`app-data` 卷 + `/actuator/health` 健康检查，`depends_on` MySQL healthy。
+- MySQL 宿主机端口默认改为 13306；`backend/pom.xml` 的 flyway 默认 URL 同步为 `localhost:13306`。
+- README 补充 Docker 后端启动、重启、容器内测试与停止命令。
+
+验证：
+- `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --wait`：mysql 与 backend 均 healthy。
+- `GET /actuator/health` → `{"status":"UP"}`；登录 demo 200；模板 6 条；上传 PNG 201（`createdAt` 毫秒精度）。
+- `docker compose ... port mysql 3306` → `0.0.0.0:13306`，与本机 3306 的其他服务不冲突。
+
+偏离与决策：
+- 开发编排与 M9 交付镜像分离：开发用 Maven 镜像直接跑源码，M9 再提供多阶段 Dockerfile，避免提前维护两套构建。

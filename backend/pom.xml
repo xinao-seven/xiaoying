@@ -22,8 +22,8 @@
     <mybatis-spring-boot.version>3.0.5</mybatis-spring-boot.version>
     <flyway.version>11.20.3</flyway.version>
 
-    <!-- 本地 flyway-maven-plugin 默认连接 compose 中的 mysql（可 -Ddb.url=... 覆盖） -->
-    <db.url>jdbc:mysql://localhost:3306/xiaoying?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC</db.url>
+    <!-- 本地 flyway-maven-plugin 默认连接 compose 中的 mysql（宿主机端口 13306，可 -Ddb.url=... 覆盖） -->
+    <db.url>jdbc:mysql://localhost:13306/xiaoying?useSSL=false&amp;allowPublicKeyRetrieval=true&amp;serverTimezone=UTC</db.url>
     <db.user>xiaoying</db.user>
     <db.password>xiaoying</db.password>
   </properties>

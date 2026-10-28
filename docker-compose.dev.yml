@@ -1,0 +1,46 @@
+# 本地开发编排：后端源码挂载进 Maven 镜像运行，无需本机安装 JDK。
+#
+# 启动：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# 停止：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+#
+# 改动 Java 代码后重建并重启后端（会重新编译）：
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate backend
+#
+# 注意：这是开发用编排，不是 M9 的交付镜像；生产镜像见 backend/Dockerfile（M9）。
+
+services:
+  backend:
+    image: maven:3.9-eclipse-temurin-21
+    working_dir: /workspace
+    command: ["mvn", "-B", "spring-boot:run"]
+    environment:
+      SPRING_DATASOURCE_URL: 'jdbc:mysql://mysql:3306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-xiaoying}
+      SPRING_DATASOURCE_PASSWORD: ${MYSQL_PASSWORD:-xiaoying}
+      APP_DATA_DIR: /data
+      APP_PIPELINE_CONCURRENCY: ${APP_PIPELINE_CONCURRENCY:-1}
+      APP_SIMULATION_DEV_API_ENABLED: ${APP_SIMULATION_DEV_API_ENABLED:-true}
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    volumes:
+      # 源码热挂载；target/ 留在宿主机（已被 .gitignore 忽略）
+      - ./backend:/workspace
+      # Maven 依赖缓存，避免每次重建都重新下载
+      - maven-cache:/root/.m2
+      # 与 M9 一致的数据卷：素材与结果
+      - app-data:/data
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 90s
+
+volumes:
+  maven-cache:
+  app-data:

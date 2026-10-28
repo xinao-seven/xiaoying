@@ -45,44 +45,68 @@
 │   └── scripts/             # 封面生成脚本
 ├── docs/                    # 需求、执行计划、完成记录
 ├── pic/                     # 前端参考 UI（仅参考布局）
-├── docker-compose.yml       # 目前仅 MySQL，M9 补齐三服务
+├── docker-compose.yml       # 基础编排（MySQL；M9 补齐三服务）
+├── docker-compose.dev.yml   # 开发编排：后端跑在 Maven 镜像里，无需本机 JDK
 └── .env.example
 ```
 
 ## 快速开始
 
-### 仅数据库（当前阶段）
+### 后端（推荐：全部跑在 Docker 里，无需本机 JDK）
 
 ```bash
-docker compose up -d mysql
+# MySQL（宿主机端口 13306，避免与本机其他 MySQL 冲突）+ 后端 8080
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+
+curl -s http://localhost:8080/actuator/health   # {"status":"UP"}
+docker compose -f docker-compose.yml -f docker-compose.dev.yml logs -f backend
 ```
 
-### 后端
+- 后端源码以绑定挂载方式放进 `maven:3.9-eclipse-temurin-21`，启动时自动编译并执行 Flyway。
+- 首次启动需要下载 Maven 依赖，约 1～3 分钟；依赖缓存在 `maven-cache` 卷，后续启动很快。
+- 修改 Java 代码后重启后端（会重新编译）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --force-recreate backend
+```
+
+- 在容器内跑测试（等价于 `./mvnw verify`）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm --no-deps backend \
+  mvn -B verify
+```
+
+- 停止（保留数据库与素材卷）：
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml down
+```
+
+- 连宿主机的 MySQL 客户端调试：`mysql -h 127.0.0.1 -P 13306 -uxiaoying -pxiaoying xiaoying`。
+
+### 后端（本机已安装 JDK 21 时）
 
 ```bash
 cd backend
 ./mvnw -q -DskipTests package
 ./mvnw spring-boot:run     # http://localhost:8080
-./mvnw flyway:info         # 需要 MySQL 已启动
+./mvnw flyway:info         # 默认连接 localhost:13306
 ```
 
-覆盖数据库连接：
+数据库连接默认值为 `jdbc:mysql://localhost:13306/xiaoying`（与 compose 的宿主机端口一致），需要时可覆盖：
 
 ```bash
 ./mvnw flyway:info -Ddb.url='jdbc:mysql://localhost:3306/xiaoying?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC' -Ddb.user=xiaoying -Ddb.password=xiaoying
 ```
 
-> 宿主机 3306 已被占用时，在仓库根目录的 `.env`（不入库）写入 `MYSQL_PORT=13306`，
-> 再使用 `jdbc:mysql://localhost:13306/xiaoying?...`。容器内服务始终使用 `mysql:3306`。
+> 宿主机 MySQL 端口由 `.env` 的 `MYSQL_PORT` 控制，默认 13306；容器内服务始终使用 `mysql:3306`。
 
-没有本地 JDK 时，可用官方 Maven 镜像执行与 `./mvnw` 等价的命令：
+### 仅数据库
 
 ```bash
-docker run --rm -v "$PWD/backend:/ws" -w /ws -v xiaoying-m2:/root/.m2 \
-  maven:3.9-eclipse-temurin-21 mvn -B verify
+docker compose up -d mysql
 ```
-
-本次 M0～M2 的构建、测试与 Flyway 校验均在 `maven:3.9-eclipse-temurin-21` 容器中完成。
 
 ### 前端
 
@@ -92,6 +116,8 @@ npm ci
 npm run dev                # http://localhost:3000
 npm run lint && npm run typecheck && npm test && npm run build
 ```
+
+> 前端开发时把 `BACKEND_URL` 指向 `http://localhost:8080` 即可复用上面的 Docker 后端。
 
 ### 演示账号
 
